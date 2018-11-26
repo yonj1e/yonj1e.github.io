@@ -26,10 +26,3 @@ branches:
 env:
  global:
    - GH_REF: github.com/yonj1e/yonj1e.github.io.git
-
-notifications:
-  email:
-    - i@think-diff.me
-    - yonj1e@163.com
-  on_success: change
-  on_failure: always
