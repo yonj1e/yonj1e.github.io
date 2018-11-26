@@ -61,7 +61,7 @@ USING staging
 WHERE destination.id = staging.id
 ```
 
-![bulk-upsert](2018-11-23-bulk-upsert\bulk-upsert.jpg)
+![bulk-upsert](2018-11-24-bulk-upsert/bulk-upsert.jpg)
 
 四. 把 staging 表批量插入到目标表，因为冲突部分已经删掉，所以这步不会有任何冲突。
 
