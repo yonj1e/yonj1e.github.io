@@ -2,7 +2,7 @@
 title: 使用异或xor加解密文件
 date: 2018-11-21
 categories: 
-  - [C语言-Demo]
+  - [C-Demo]
 tags: 
   - C-Demo
 ---
