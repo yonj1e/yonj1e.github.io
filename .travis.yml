@@ -1,6 +1,3 @@
-language: node_js
-node_js: stable
-
 # S: Build Lifecycle
 install:
   - npm install -g hexo
