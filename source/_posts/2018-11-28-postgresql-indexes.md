@@ -39,11 +39,11 @@ Index is an additional data structure, which can help us with:
 - Aggregations - indexes can effectively calculate some aggregation function (count, min, max, etc)
 - Grouping - indexes can effectively calculate the arbitrary grouping and aggregate functions (sort-group algorithm)
 
-- 数据查询 - 所有索引都支持等值查询。一些索引还支持前缀搜索（如 “abc%”），任意范围搜索
+- 数据搜索 - 所有索引都支持等值搜索。一些索引还支持前缀搜索（如 “abc%”），任意范围搜索
 - 优化器 - B-Tree和R-Tree索引表示直方图任意精度
-- Join - 索引可用于Merge，Index算法
-- Relation - 索引可用于except/intersect操作
-- 聚合 - 索引可以有效地计算一些聚合函数（count，min，max等）
+- 连接 - 索引可用于Merge，Index算法
+- 关系 - 索引可用于except/intersect操作
+- 聚合 - 索引可以有效地计算一些聚合函数（count，min，max 等）
 - 分组 - 索引可以有效地计算任意分组和聚合函数（sort-group 算法）
 
 ## PostgreSQL Index Types
@@ -65,7 +65,7 @@ Advantages:
 - Allow the entire sequence of data to estimate cardinality (number of entries) for the entire index (and therefore the table), range, and with arbitrary precision without scanning
 - 保留排序数据
 - 支持搜索一元和二元谓词
-- 允许整个数据序列估算整个索引（以及表），范围和任意精度的基数（条目数），无需扫描
+- 允许整个数据序列估算整个索引（以及表），范围和任意精度的基数（条目数），而无需扫描
 
 Disadvantages:
 
@@ -81,7 +81,7 @@ Disadvantages:
 
 R-Tree (rectangle-tree) index storing numeric type pairs of (X, Y) values (for example, the coordinates). R-Tree is very similar to B-Tree. The only difference is the information written to intermediate page in a tree. For the i-th value of the B-Tree node we write the most out of the i-th subtree. In R-Tree it is a minimum rectangle that encloses all the rectangles of the child. Details can be seen in figure:
 
-R-Tree（矩形树）索引，存储（X，Y）值的数值类型对（例如，坐标）。R-Tree与B-Tree非常相似。唯一的区别是写入树中间页面的信息。对于B-Tree节点的第i个值，我们从第i个子树中写出最多。在R-Tree中，它是一个包含孩子所有矩形的最小矩形。细节可以在图中看到：
+R-Tree（矩形树）索引，存储数值类型对（X，Y）值（例如，坐标）。R-Tree与B-Tree非常相似。唯一的区别是写入树中间页面的信息。对于B-Tree节点的第i个值，我们从第i个子树中写出最多。在R-Tree中，它是一个包含孩子所有矩形的最小矩形。细节可以在图中看到：
 
 ![R-Tree](2018-11-28-postgresql-indexes/pg_indexes2.jpg)
 
@@ -96,8 +96,8 @@ Disadvantages:
 
 - Significant redundancy in the data storage
 - Slow update
-- 数据存储中的重大冗余
-- 缓慢更新
+- 数据存储有显著冗余
+- 更新缓慢
 
 In general, the pros-cons are very similar to B-Tree.
 
@@ -111,7 +111,7 @@ Hash index doesn’t store the values, but their hashes. Such indexing way reduc
 
 Because hash functions is non-linear, such index cannot be sorted. This causes inability to use the comparisons more/less and “IS NULL” with this index. In addition, since the hashes are not unique, then the matching hashes used methods of resolving conflicts.
 
-由于散列函数是非线性的，因此无法对此类索引进行排序。这导致无法使用此索引更多/更少和“IS NULL”。另外，由于散列不是唯一的，因此匹配散列使用了解决冲突的方法。
+由于散列函数是非线性的，因此无法对此类索引进行排序。这导致无法使用此索引大于、小于和“IS NULL”。另外，由于散列不是唯一的，因此匹配散列使用了解决冲突的方法。
 
 ![Hash indexes](2018-11-28-postgresql-indexes/hash_indexes.png)
 
@@ -125,17 +125,17 @@ Advantages:
 Disadvantages:
 
 - Hash is very sensitive to collisions. In the case of “bad” data distribution, most of the entries will be concentrated in a few bouquets, and in fact the search will occur through collision resolution.
-- 哈希对碰撞非常敏感。在“坏”数据分发的情况下，大多数条目将集中在几个花束中，并且实际上搜索将通过冲突解决来进行。
+- 哈希对碰撞非常敏感。在“坏”数据分布的情况下，大多数条目将集中在几个花束中，实际上搜索将通过冲突解析进行。
 
 As you can see, Hash indexes are only useful for equality comparisons, but you pretty much never want to use them since they are not transaction safe, need to be manually rebuilt after crashes, and are not replicated to followers in PostgreSQL (all this fixed in PostgreSQL 10).
 
-正如您所看到的，Hash索引仅对等式比较有用，但您几乎不想使用它们，因为它们不是事务安全的，需要在崩溃后手动重建，并且不会复制到PostgreSQL中的关注者（所有这些都已修复） 在PostgreSQL 10）。
+正如您所看到的，Hash索引仅对等式比较有用，但您几乎不想使用它们，因为它们不是事务安全的，需要在崩溃后手动重建，并且不会复制到PostgreSQL中的备库（所有这些在PostgreSQL 10 都已修复）。
 
 #### Bitmap index
 
 Bitmap index create a separate bitmap (a sequence of 0 and 1) for each possible value of the column, where each bit corresponds to a string with an indexed value. Bitmap indexes are optimal for data where bit unique values (example, gender field).
 
-位图索引为列的每个可能值创建单独的位图（0和1的序列），其中每个位对应于具有索引值的字符串。位图索引对于位唯一值（例如，性别字段）的数据是最佳的。
+位图索引为列的每个可能值创建单独的位图（0和1的序列），其中每个位对应于具有索引值的字符串。位图索引最适合于BIT唯一值的数据(例如，性别字段)。
 
 ![Bitmap indexes](2018-11-28-postgresql-indexes/bitmap.png)
 
@@ -144,9 +144,9 @@ Advantages:
 - Compact representation (small amount of disk space)
 - Fast reading and searching for the predicate “is”
 - Effective algorithms for packing masks (even more compact representation, than indexed data)
-- 紧凑的表示（少量的磁盘空间）
-- 快速阅读和搜索谓词“是”
-- 用于打包掩码的有效算法（甚至比索引数据更紧凑的表示）
+- 紧凑表示(少量磁盘空间)
+- 快速读取和搜索谓词“is”
+- 包装掩码的有效算法(比索引数据更紧凑的表示)
 
 Disadvantages:
 
@@ -170,13 +170,13 @@ The essential difference lies in the organization of the key. B-Tree trees sharp
 Advantages:
 
 - Efficient search
-- 高效的搜索
+- 搜索高效
 
 Disadvantages:
 
 - Large redundancy
 - The specialized implementation for each query group are nessesary
-- 大冗余
+- 冗余大
 - 每个查询组的专门实现是必要的
 
 The rest of the pros-cons similar to B-Tree and R-Tree.
@@ -201,7 +201,7 @@ Key features:
 - Works well for frequent recurrence of elements (and therefore are perfect for full-text search)
 
 - 非常适合全文搜索
-- 寻找完整匹配（“是”，但不是“更少”或“更多”）。
+- 寻找完整匹配
 - 非常适合半结构化数据搜索
 - 允许您一次执行多个不同的搜索（查询）
 - 比GiST更好的扩展（支持大量数据）
@@ -223,7 +223,7 @@ More info about this index you can read in [this article](http://pythonsweetness
 
 A partial index covers just a subset of a table’s data. It is an index with a `WHERE` clause. The idea is to increase the efficiency of the index by reducing its size. A smaller index takes less storage, is easier to maintain, and is faster to scan.
 
-部分索引仅涵盖表数据的子集。它是一个带有WHERE子句的索引。这个想法是通过减小其规模来提高指数的效率。较小的索引占用较少的存储空间，易于维护，扫描速度更快。
+部分索引仅涵盖表数据的子集。它是一个带有`WHERE`子句的索引。这个想法是通过减小其规模来提高指数的效率。较小的索引占用较少的存储空间，易于维护，扫描速度更快。
 
 For example, suppose you log in table some information about network activity and very often you need check logs from local IP range. You may want to create an index like so:
 
@@ -253,15 +253,13 @@ Expression indexes are useful for queries that match on some function or modific
 
 For example, suppose you doing very often search by first leter in lower case from `name` field. You may want to create an index like so:
 
-例如，假设您经常在名称字段中使用小写的第一个leter进行搜索。您可能想要创建一个索引，如下所示：
+例如，假设您经常按首字母从名称字段进行小写搜索。您可能想要创建一个索引，如下所示：
 
 ```sql
 CREATE INDEX users_name_first_idx ON foo ((lower(substr(name, 1, 1))));
 ```
 
 and such sql query will use such index
-
-而这样的sql查询将使用这样的索引
 
 ```sql
 SELECT * FROM users WHERE lower(substr(name, 1, 1)) = 'a';
