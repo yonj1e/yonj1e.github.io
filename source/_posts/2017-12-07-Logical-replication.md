@@ -2,7 +2,7 @@
 title: PostgreSQL逻辑复制实践
 date: 2017-12-07 
 categories: 
-  - [PostgreSQL - Usage]
+  - [PostgreSQL - 最佳实践]
 tags: 
   - High-availability
   - Replication
