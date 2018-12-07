@@ -3,7 +3,7 @@ title: 使用Docker部署PostgreSQL
 date: 2018-07-30 
 categories: 
   - [Docker]
-  - [PostgreSQL - Usage]
+  - [PostgreSQL - 最佳实践]
 tags: 
   - Docker
   - PostgreSQL

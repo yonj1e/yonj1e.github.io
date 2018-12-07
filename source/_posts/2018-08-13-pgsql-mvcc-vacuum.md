@@ -2,7 +2,7 @@
 title: MVCC及AutoVacuum机制浅析
 date: 2018-08-13 
 categories: 
-  - [PostgreSQL - Internals]
+  - [PostgreSQL - 源码分析]
 tags: 
   - MVCC
   - AutoVacuum

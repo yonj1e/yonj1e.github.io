@@ -2,7 +2,7 @@
 title: 基于Quorum同步流复制
 date: 2017-12-07 
 categories: 
-  - [PostgreSQL - Usage]
+  - [PostgreSQL - 特性分析]
 tags: 
   - Replication
   - PostgreSQL

@@ -2,7 +2,7 @@
 title: 添加语法
 date: 2018-06-22 
 categories: 
-  - [PostgreSQL - Develop]
+  - [PostgreSQL - 开发笔记]
 tags: 
   - Parse
   - PostgreSQL

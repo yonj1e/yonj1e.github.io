@@ -2,7 +2,8 @@
 title: AutoVacuum概述
 date: 2018-08-11
 categories: 
-  - [PostgreSQL - Internals]
+  - [PostgreSQL - 源码分析]
+  - [PostgreSQL - 特性分析]
 tags: 
   - AutoVacuum
   - PostgreSQL

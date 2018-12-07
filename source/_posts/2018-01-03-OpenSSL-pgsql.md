@@ -2,7 +2,7 @@
 title: OpenSSL连接PostgreSQL数据库服务器
 date: 2018-01-03 
 categories: 
-  - [PostgreSQL - Usage]
+  - [PostgreSQL - 最佳实践]
 tags: 
   - PostgreSQL
   - OpenSSL

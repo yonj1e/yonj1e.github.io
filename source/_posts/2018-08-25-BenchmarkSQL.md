@@ -3,7 +3,7 @@ title: 使用BenchmarkSQL测试PostgreSQL
 date: 2018-08-25 
 categories: 
   - [BenchmarkSQL]
-  - [PostgreSQL - Usage]
+  - [PostgreSQL - 最佳实践]
 tags: 
   - BenchmarkSQL
   - PostgreSQL

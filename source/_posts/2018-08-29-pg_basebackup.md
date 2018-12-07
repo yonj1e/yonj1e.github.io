@@ -2,7 +2,7 @@
 title: pg_basebackup物理备份内部原理
 date: 2018-08-29 
 categories: 
-  - [PostgreSQL - Internals]
+  - [PostgreSQL - 源码分析]
 tags: 
   - pg_basebackup
   - PostgreSQL

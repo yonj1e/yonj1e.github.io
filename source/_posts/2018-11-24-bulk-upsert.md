@@ -2,7 +2,7 @@
 title: PostgreSQL中批量Upsert
 date: 2018-11-24
 categories: 
-  - [PostgreSQL - Usage]
+  - [PostgreSQL - 最佳实践]
 tags: 
   - PostgreSQL
   - COPY

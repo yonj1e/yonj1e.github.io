@@ -2,7 +2,7 @@
 title: page的内部结构
 date: 2018-07-20 
 categories: 
-  - [PostgreSQL - Internals]
+  - [PostgreSQL - 源码分析]
 tags: 
   - PostgreSQL
   - Page

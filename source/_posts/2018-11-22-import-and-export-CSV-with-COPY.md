@@ -2,7 +2,7 @@
 title: PostgreSQL的COPY导入导出CSV
 date: 2018-11-22
 categories: 
-  - [PostgreSQL - Usage]
+  - [PostgreSQL - 最佳实践]
 tags: 
   - PostgreSQL
   - COPY

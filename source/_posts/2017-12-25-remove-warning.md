@@ -2,9 +2,10 @@
 title: 消除编译警告
 date: 2017-12-25 
 categories: 
-  - [PostgreSQL - Develop]
+  - [C]
 tags: 
   - Make
+  - C
 ---
 
 

@@ -2,7 +2,7 @@
 title: autovacuum和参数配置
 date: 2018-08-10 
 categories: 
-  - [PostgreSQL - Usage]
+  - [PostgreSQL - 特性分析]
 tags: 
   - AutoVacuum
   - PostgreSQL

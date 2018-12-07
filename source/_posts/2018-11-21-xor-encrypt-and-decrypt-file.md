@@ -2,9 +2,9 @@
 title: 使用异或xor加解密文件
 date: 2018-11-21
 categories: 
-  - [C-Demo]
+  - [C]
 tags: 
-  - C-Demo
+  - C
 ---
 
 [原文](https://blog.csdn.net/fdipzone/article/details/20413631)

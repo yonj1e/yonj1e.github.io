@@ -2,7 +2,7 @@
 title: PostgreSQL11分区表用法及增强
 date: 2018-06-15 
 categories: 
-  - [PostgreSQL - Usage]
+  - [PostgreSQL - 特性分析]
 tags: 
   - PostgreSQL
   - Partition
@@ -12,11 +12,11 @@ tags:
 
 PostgreSQL 10 是第一个支持内置声明式分区表的版本。支持 range、list 分区，与以前的版本相比，提供了显著的性能和易用性优势，但却忽略了许多功能特性和性能优化。PostgreSQL 11 为分区表功能提供更多的改进。这些特性包括：hash 分区、索引增强、DML改进，以及性能优化：faster partition pruning、run-time partition pruning,、partition-wise join。
 
-# 功能特性
+## 功能特性
 
 下面简单介绍下PostgreSQL分区表的使用以及 11 改进的地方。
 
-## range 分区
+#### range 分区
 
 语法：
 
@@ -121,7 +121,7 @@ select *, tableoid::regclass from test_range_key order by x,y;
 分区键由多个字段组成时，FROM (0, 10) TO (10, 30) 不是简单地以每个字段做上下限（0 < x < 10 and 10 < y < 30），
 实际约束定义((x > 0) OR ((x = 0) AND (y >= 10))) AND ((x < 10) OR ((x = 10) AND (y < 30)))，是根据 `ORDER BY` 的形式做的。
 
-## list 分区
+#### list 分区
 
 语法：
 
@@ -173,7 +173,7 @@ Indexes:
 
 list分区不支持多列。
 
-## hash 分区
+#### hash 分区
 
 语法：
 
@@ -255,7 +255,7 @@ Partition of: test_hash_key FOR VALUES WITH (modulus 2, remainder 0)
 Partition constraint: satisfies_hash_partition('16561'::oid, 2, 0, x, y)
 ```
 
-## 默认分区
+#### 默认分区
 
 PostgreSQL 11新特性，防止插入失败，对于不符合分区约束的数据将会插入到默认分区。
 
@@ -340,7 +340,7 @@ select *, tableoid::regclass from test_list;
 
 
 
-## 多级分区
+#### 多级分区
 
 ```sql
 create table test_range_list(id int, city text, date date) 
@@ -401,7 +401,7 @@ Partition of: test_range_list_jn FOR VALUES FROM ('2018-01-01') TO ('2018-02-01'
 Partition constraint: ((city IS NOT NULL) AND (city = '济南'::text) AND (date IS NOT NULL) AND (date >= '2018-01-01'::date) AND (date < '2018-02-01'::date))
 ```
 
-## ATTACH/DETACH 分区
+#### ATTACH/DETACH 分区
 
 语法：
 
@@ -468,7 +468,7 @@ Partitions: test_hash_1 FOR VALUES WITH (modulus 2, remainder 0),
             test_hash_attach FOR VALUES WITH (modulus 2, remainder 1)
 ```
 
-## 外部表做为分区表
+#### 外部表做为分区表
 
 简单介绍如何添加外部表作为分区表，另外还有10版本存在的几个疑问是否得到解决，详见示例。
 
@@ -557,7 +557,7 @@ select *, tableoid::regclass from test_range;
 (2 rows)
 ```
 
-## 索引增强
+#### 索引增强
 
 主要以下改进：
 
@@ -731,7 +731,7 @@ select * from test_trigger ;
 
 
 
-## DML改进
+#### DML改进
 
 有以下三处改进，给出简单示例。
 
@@ -846,7 +846,7 @@ select *, tableoid::regclass from test_unique;
 
 
 
-# 性能提升
+## 性能提升
 
 以上是目前PG分区表的的一些功能特性，接下来说一下11版本对性能的提升。
 
@@ -858,7 +858,7 @@ PostgreSQL为了避免在不必要地分区中搜索数据，只扫描符合条�
 
 PostgreSQL提供了新的特性来过滤分区：plan-time and run-time partition prune，并添加了新的GUC参数`enable_partition_pruning`，该参数控制SELECT使用新的技术，UPDATE/DELETE暂不支持。
 
-## Faster Partition Pruning
+#### Faster Partition Pruning
 
 [Faster Partition Pruning](https://git.postgresql.org/gitweb/?p=postgresql.git;a=commit;h=9fdb675fc5d2de825414e05939727de8b120ae81) 
 
@@ -890,7 +890,7 @@ PostgreSQL提供了新的特性来过滤分区：plan-time and run-time partitio
 
 这个是计划时的partition prune，后面介绍执行时的partition prune。
 
-## run-time partition pruning：PREPARE
+#### run-time partition pruning：PREPARE
 
 [run-time partition pruning](https://git.postgresql.org/gitweb/?p=postgresql.git;a=commit;h=499be013de65242235ebdde06adb08db887f0ea5) 
 
@@ -919,7 +919,7 @@ SELECT ... FROM parttab WHERE partkey =（SELECT ... FROM othertable WHERE ...�
 
 以上基准测试出自2ndquadrant David Rowley 的博客。
 
-## partition-wise join
+#### partition-wise join
 
 **partition join**
 

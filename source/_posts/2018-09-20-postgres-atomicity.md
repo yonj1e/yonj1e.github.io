@@ -2,7 +2,7 @@
 title: How Postgres Makes Transactions Atomic
 date: 2018-09-20 
 categories: 
-  - [PostgreSQL - Internals]
+  - [PostgreSQL - 理论基础]
 tags: 
   - PostgreSQL
   - Transaction

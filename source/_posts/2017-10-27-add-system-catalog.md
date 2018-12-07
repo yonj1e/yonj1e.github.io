@@ -2,7 +2,7 @@
 title: 添加系统表
 date: 2017-10-27 
 categories: 
-  - [PostgreSQL - Develop]
+  - [PostgreSQL - 开发笔记]
 tags: 
   - System Catalogs
   - PostgreSQL

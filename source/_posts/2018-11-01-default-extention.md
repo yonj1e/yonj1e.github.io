@@ -2,7 +2,7 @@
 title: 添加默认扩展
 date: 2018-11-01 
 categories: 
-  - [PostgreSQL - Develop]
+  - [PostgreSQL - 开发笔记]
 tags: 
   - PostgreSQL
 ---

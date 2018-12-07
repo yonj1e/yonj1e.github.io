@@ -2,7 +2,7 @@
 title: 理解MVCC和VACUUM以及调整AutoVacuum
 date: 2018-08-06
 categories: 
-  - [PostgreSQL - Usage]
+  - [PostgreSQL - 特性分析]
 tags: 
   - MVCC
   - AutoVacuum

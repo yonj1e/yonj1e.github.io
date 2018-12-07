@@ -2,7 +2,7 @@
 title: PostgreSQL 索引
 date: 2018-11-28 
 categories: 
-  - [PostgreSQL - Internals]
+  - [PostgreSQL - 理论基础]
 tags: 
   - PostgreSQL
   - Index
