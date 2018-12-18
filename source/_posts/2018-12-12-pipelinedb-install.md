@@ -15,8 +15,6 @@ PipelineDB is a PostgreSQL extension for high-performance time-series aggregatio
 
 #### 源码编译安装PipelineDB
 
-前提：
-
 [PostgreSQL](https://github.com/postgres/postgres)
 
 ```shell
@@ -35,25 +33,31 @@ make clean; make; make install;
 ```shell
 #!/bin/bash
 
+PASSWD='rootroot'
+
+# 安装依赖，否则，libzmq/autogen.sh 报错
+echo $PASSWD | sudo yum install libtool -y
+
 git clone git@github.com:zeromq/libzmq.git
 cd libzmq/
 ./autogen.sh 
 # 指定--prefix=/usr，或者修改pipelinedb Makefile
+# SHLIB_LINK += /usr/local/lib/libzmq.a -lstdc++
 # 添加后面的编译选项，否则编译pipeline报错：xxx can not be used when making a shared object; recompile with -fPIC
 ./configure --prefix=/usr CPPFLAGS=-DPIC CFLAGS=-fPIC CXXFLAGS=-fPIC LDFLAGS=-fPIC
 make; 
 # make check;
-sudo make install;
-sudo ldconfig
+echo $PASSWD | sudo make install;
+echo $PASSWD | sudo ldconfig
 ```
 [PipelineDB](https://github.com/pipelinedb/pipelinedb)
 
 ```shell
 #!/bin/bash
 
-cd postgres/contrib
 git clone git@github.com:pipelinedb/pipelinedb.git
 cd pipelinedb
+export PATH=$PATH:/work/pgsql/pgsql-11-stable/bin/
 make USE_PGXS=1
 make install
 ```
@@ -63,6 +67,7 @@ make install
 ```sql
 # postgresql.conf
 shared_preload_libraries = 'pipelinedb' 
+
 $ ./pg_ctl -D ../data start
 $ ./psql postgres
 psql (11.1)
