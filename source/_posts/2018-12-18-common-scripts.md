@@ -61,3 +61,24 @@ expect "100%"
 expect eof
 ```
 
+#### 判断文件夹是否存在
+
+```shell
+!/bin/bash
+
+if [ ! -d testmkdir ];
+then
+  mkdir testmkdir
+else
+  echo dir exist
+fi
+```
+
+#### 脚本报错立即退出
+
+```shell
+#!/bin/bash
+
+set -o errexit
+```
+
