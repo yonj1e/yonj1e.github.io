@@ -1,10 +1,11 @@
 ---
-title: 常用脚本
+title: Shell常用脚本
 date: 2018-11-18 
 categories: 
-  - [Scripts]
+  - [Shell]
 tags: 
-  - Scripts
+  - Linux
+  - Shell
 ---
 
 

@@ -2,17 +2,17 @@
 title: 编译脚本
 date: 2017-03-26 
 categories: 
-  - [Scripts]
+  - [Shell]
 tags: 
   - Configure
-  - Scripts
+  - Shell
 ---
 
 
 
 源码编译PostgreSQL时，执行configure时可能会报错缺少相应的包。
 
-Redhat/CentOS
+#### Redhat/CentOS
 
 ```shell
 #!/bin/bash   
@@ -37,9 +37,7 @@ gtk2-devel \
 automake \
 ```
 
-
-
-Debian/Ubuntu
+#### Debian/Ubuntu
 
 ```shell
 #!/bin/bash

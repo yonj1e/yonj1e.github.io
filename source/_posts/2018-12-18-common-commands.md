@@ -1,5 +1,5 @@
 ---
-title: 常用命令
+title: Linux常用命令
 date: 2018-11-18 
 categories: 
   - [Linux]
@@ -13,8 +13,7 @@ tags:
 
 ```shell
 # 批量杀死 postgres* 进程
-ps -ef | grep postgres | grep -v grep | cut -c 9-15 | xargs kill -9
-ps -ef | grep module- | grep -v module-mxm | cut -c 9-15 | xargs kill -9
+
 # ps -ef | grep module-  
 # 查找关键字包含module-的所有进程
 # grep -v module-mxm
@@ -23,7 +22,9 @@ ps -ef | grep module- | grep -v module-mxm | cut -c 9-15 | xargs kill -9
 # 截取第9至15字符（进程id）
 # xargs kill -9
 # 将截取的9-15字符（进程id）作为kill -9 后的参数
+ps -ef | grep module- | grep -v module-mxm | cut -c 9-15 | xargs kill -9
 ps -ef | grep aaa | grep -v grep | awk '{print "kill -9 " $2}' | sh
+ps -ef | grep postgres | grep -v grep | cut -c 9-15 | xargs kill -9
 ```
 
 #### 批量删除某后缀的文件
