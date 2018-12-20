@@ -19,11 +19,8 @@ tags:
 # ----------------------------------------
 
 FILE=highgo
-FILE_NAME=${FILE}.`date '+%Y%m%d'`.tar.gz
 
-NEW_FILE=`ls -rt | sed '/sh/d' | tail -n1`
-var=`echo ${NEW_FILE}|awk -F '-' '{print $2}'|awk -F '.' '{print $1}'`
-
+var=`ls *\`date '+%Y%m%d'\`*|wc -l`
 let var+=1
 
 tar zcvf ${FILE}.`date '+%Y%m%d'`-${var}.tar.gz ${FILE}
@@ -81,5 +78,19 @@ fi
 #!/bin/bash
 
 set -o errexit
+```
+
+#### 多行注释
+
+```shell
+#!/bin/bash
+
+:<<EOF
+# Multiline comment
+# Multiline comment
+# Multiline comment
+EOF
+
+echo a
 ```
 

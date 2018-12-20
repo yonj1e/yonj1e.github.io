@@ -12,7 +12,7 @@ tags:
 
 PostgreSQL 10 是第一个支持内置声明式分区表的版本。支持 range、list 分区，与以前的版本相比，提供了显著的性能和易用性优势，但却忽略了许多功能特性和性能优化。PostgreSQL 11 为分区表功能提供更多的改进。这些特性包括：hash 分区、索引增强、DML改进，以及性能优化：faster partition pruning、run-time partition pruning,、partition-wise join。
 
-## 功能特性
+### 功能特性
 
 下面简单介绍下PostgreSQL分区表的使用以及 11 改进的地方。
 
@@ -562,7 +562,6 @@ select *, tableoid::regclass from test_range;
 主要以下改进：
 
 1. 分区主表可以有索引
-
 2. 分区主表可以创建唯一约束，需要包含分区键(示例 2)
 3. 分区主表可以创建外键，但是不能参照分区表创建外键(示例 3)
 4. 分区主表可以创建 FOR EACH ROW 触发器
@@ -844,9 +843,7 @@ select *, tableoid::regclass from test_unique;
 (1 row)
 ```
 
-
-
-## 性能提升
+### 性能提升
 
 以上是目前PG分区表的的一些功能特性，接下来说一下11版本对性能的提升。
 
