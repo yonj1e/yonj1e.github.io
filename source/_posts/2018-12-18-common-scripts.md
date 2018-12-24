@@ -94,3 +94,18 @@ EOF
 echo a
 ```
 
+#### sed 替换路径
+
+```shell
+#!/bin/bash
+
+OLD_VARPATH="/opt/HighGo/db"
+NEW_VARPATH="/work/hgdb/hgdb5"
+OLD_VARPATHSED=$(echo ${OLD_VARPATH} |sed -e 's/\//\\\//g' )
+NEW_VARPATHSED=$(echo ${NEW_VARPATH} |sed -e 's/\//\\\//g' )
+
+#sed -e "s/${OLD_VARPATHSED}/${NEW_VARPATHSED}/g" ./output.txt
+
+#cat input.txt |sed -e "s/VARPATH/${VARPATHSED}/g" > output.txt
+```
+
