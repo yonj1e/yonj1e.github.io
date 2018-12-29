@@ -36,7 +36,7 @@ tar zcvf ${FILE}.`date '+%Y%m%d'`-${var}.tar.gz ${FILE}
 # 使用expect来完成scp时无需输入密码
 # ----------------------------------------
 
-set timeout 10
+set timeout 300
 set host [lindex $argv 0]
 set username [lindex $argv 1]
 set password [lindex $argv 2]
