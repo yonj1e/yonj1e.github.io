@@ -1,6 +1,15 @@
+---
+title: 浅谈数据库误操作恢复
+date: 2018-12-12
+categories: 
+  - [PostgreSQL - 最佳实践]
+tags: 
+  - RITR
+  - Flashback
+  - PostgreSQL
+---
 
 
-## 浅谈数据库误操作恢复
 
 在使用数据库的过程中，不管是业务开发者还是运维人员，都有可能对数据库进行误操作，比如全表不带条件的update或delete等。
 
@@ -44,7 +53,127 @@ zheap 将通过允许就地更新来防止膨胀，zheap只会保存最后一个
 
 ##### 延迟从库
 
+默认情况下，备用服务器会尽快从主服务器恢复WAL记录。
 
+拥有时间延迟的数据副本可能很有用，可以提供纠正数据丢失错误的机会。
+
+```shell
+# 是应用延迟，不是传输延迟
+# 主库还是会等从库落盘才会提交
+recovery_min_apply_delay （integer）
+```
+
+使用repmgr搭建的流复制集群，修改备节点recovery.conf，设置recovery_min_apply_delay = 5min
+
+```shell
+# primary
+[yangjie@young-91 bin]$ ./repmgr cluster show
+ ID | Name     | Role    | Status    | Upstream | Location | Replication lag | Last replayed LSN
+----+----------+---------+-----------+----------+----------+-----------------+-------------------
+ 1  | young-91 | primary | * running |          | default  | n/a             | none             
+ 2  | young-90 | standby |   running | young-91 | default  | 0 bytes         | 0/20235CF0
+ 
+# standby
+[yangjie@young-90 bin] ./repmgr cluster show
+ ID | Name     | Role    | Status    | Upstream | Location | Replication lag | Last replayed LSN
+----+----------+---------+-----------+----------+----------+-----------------+-------------------
+ 1  | young-91 | primary | * running |          | default  | n/a             | none             
+ 2  | young-90 | standby |   running | young-91 | default  | 0 bytes         | 0/20235CF0  
+[yangjie@young-90 bin]$ cat ../data/recovery.conf 
+standby_mode = 'on'
+primary_conninfo = 'host=''young-91'' user=repmgr connect_timeout=2 fallback_application_name=repmgr application_name=''young-90'''
+recovery_target_timeline = 'latest'
+recovery_min_apply_delay = 5min
+```
+
+在主节点创建表并插入几条数据，检查复制延迟
+
+```sql
+-- primary
+-- 主节点创建表并插入几条测试数据
+highgo=# create table test_recovery_delay(id int, ts timestamp);
+CREATE TABLE
+highgo=# insert into test_recovery_delay values (1,now());
+INSERT 0 1
+highgo=# insert into test_recovery_delay values (2,now());
+INSERT 0 1
+highgo=# select * from test_recovery_delay ;
+ id |             ts             
+----+----------------------------
+  1 | 2019-01-08 13:07:12.699596
+  2 | 2019-01-08 13:07:16.291744
+(2 rows)
+
+-- standby
+highgo=# \d
+                   List of relations
+ Schema |           Name           |   Type   |  Owner  
+--------+--------------------------+----------+---------
+ public | t_test                   | table    | yangjie
+ public | t_test_id_seq            | sequence | yangjie
+ public | test                     | table    | yangjie
+(3 rows)
+
+-- 等五分钟
+
+highgo=# \d
+                   List of relations
+ Schema |           Name           |   Type   |  Owner  
+--------+--------------------------+----------+---------
+ public | t_test                   | table    | yangjie
+ public | t_test_id_seq            | sequence | yangjie
+ public | test                     | table    | yangjie
+ public | test_recovery_delay      | table    | yangjie
+(4 rows)
+```
+
+也可以通过 repmgr node status 查看Last received LSN，Last replayed LSN，Replication lag等信息：
+
+```shell
+# standby
+[yangjie@young-90 bin]$ ./repmgr node status
+Node "young-90":
+	HighGo Database version: 5.1.0
+	Total data size: 397 MB
+	Conninfo: host=young-90 user=repmgr dbname=repmgr connect_timeout=2
+	Role: standby
+	WAL archiving: off
+	Archive command: (none)
+	Replication connections: 0 (of maximal 10)
+	Replication slots: 0 (of maximal 10)
+	Upstream node: young-91 (ID: 1)
+	Replication lag: 395 seconds
+	Last received LSN: 0/202A8ED8
+	Last replayed LSN: 0/20295440
+```
+
+或者SQL：
+
+```sql
+SELECT ts, 
+		last_wal_receive_lsn, 
+		last_wal_replay_lsn, 
+		last_xact_replay_timestamp, 
+	CASE WHEN (last_wal_receive_lsn = last_wal_replay_lsn) 
+		THEN 0::INT 
+	ELSE 
+		EXTRACT(epoch FROM (pg_catalog.clock_timestamp() - last_xact_replay_timestamp))::INT 
+	END AS replication_lag_time, 
+	COALESCE(last_wal_receive_lsn, '0/0') >= last_wal_replay_lsn AS receiving_streamed_wal 
+FROM ( 
+	SELECT CURRENT_TIMESTAMP AS ts, 
+		pg_catalog.pg_last_wal_receive_lsn()       AS last_wal_receive_lsn, 
+		pg_catalog.pg_last_wal_replay_lsn()        AS last_wal_replay_lsn, 
+		pg_catalog.pg_last_xact_replay_timestamp() AS last_xact_replay_timestamp 
+) q ;
+-[ RECORD 1 ]--------------+------------------------------
+ts                         | 2019-01-08 13:18:19.961552+08
+last_wal_receive_lsn       | 0/202ADAC0
+last_wal_replay_lsn        | 0/202AB940
+last_xact_replay_timestamp | 2019-01-08 13:11:47.534904+08
+replication_lag_time       | 392
+receiving_streamed_wal     | t
+```
 
 ##### 基于时间点恢复
 
@@ -56,3 +185,4 @@ zheap 将通过允许就地更新来防止膨胀，zheap只会保存最后一个
 
 #### 相关链接
 
+https://www.postgresql.org/docs/11/standby-settings.html

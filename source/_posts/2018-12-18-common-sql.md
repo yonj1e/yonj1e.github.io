@@ -71,3 +71,31 @@ ORDER BY c2.relname;
 (3 rows)
 ```
 
+#### 复制相关
+
+```sql
+SELECT ts, 
+		last_wal_receive_lsn, 
+		last_wal_replay_lsn, 
+		last_xact_replay_timestamp, 
+	CASE WHEN (last_wal_receive_lsn = last_wal_replay_lsn) 
+		THEN 0::INT 
+	ELSE 
+		EXTRACT(epoch FROM (pg_catalog.clock_timestamp() - last_xact_replay_timestamp))::INT 
+	END AS replication_lag_time, 
+	COALESCE(last_wal_receive_lsn, '0/0') >= last_wal_replay_lsn AS receiving_streamed_wal 
+FROM ( 
+	SELECT CURRENT_TIMESTAMP AS ts, 
+		pg_catalog.pg_last_wal_receive_lsn()       AS last_wal_receive_lsn, 
+		pg_catalog.pg_last_wal_replay_lsn()        AS last_wal_replay_lsn, 
+		pg_catalog.pg_last_xact_replay_timestamp() AS last_xact_replay_timestamp 
+) q ;
+-[ RECORD 1 ]--------------+------------------------------
+ts                         | 2019-01-08 10:56:28.017296+08
+last_wal_receive_lsn       | 0/20197210
+last_wal_replay_lsn        | 0/20197210
+last_xact_replay_timestamp | 2019-01-08 10:56:08.481199+08
+replication_lag_time       | 0
+receiving_streamed_wal     | t
+```
+

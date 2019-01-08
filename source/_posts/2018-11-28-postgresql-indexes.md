@@ -1,5 +1,5 @@
 ---
-title: PostgreSQL 索引
+title: PostgreSQL索引
 date: 2018-11-28 
 categories: 
   - [PostgreSQL - 理论基础]
