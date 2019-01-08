@@ -107,3 +107,25 @@ NEW_VARPATHSED=$(echo ${NEW_VARPATH} |sed -e 's/\//\\\//g' )
 sed -i "s/${OLD_VARPATHSED}/${NEW_VARPATHSED}/g" ./output.txt
 ```
 
+#### 拉取代码
+
+```shell
+#/bin/bash
+
+set -o errexit
+
+SRCDIR=/work/source
+
+for dirname in `ls ${SRCDIR} | sort -n`
+do
+	echo $dirname
+	if [ -d ${dirname} ];
+	then
+		cd ${dirname}
+		git checkout master
+        	git pull
+        	cd ${SRCDIR}
+	fi
+done
+```
+

@@ -91,13 +91,13 @@ recovery_min_apply_delay = 5min
 ```sql
 -- primary
 -- 主节点创建表并插入几条测试数据
-highgo=# create table test_recovery_delay(id int, ts timestamp);
+postgres=# create table test_recovery_delay(id int, ts timestamp);
 CREATE TABLE
-highgo=# insert into test_recovery_delay values (1,now());
+postgres=# insert into test_recovery_delay values (1,now());
 INSERT 0 1
-highgo=# insert into test_recovery_delay values (2,now());
+postgres=# insert into test_recovery_delay values (2,now());
 INSERT 0 1
-highgo=# select * from test_recovery_delay ;
+postgres=# select * from test_recovery_delay ;
  id |             ts             
 ----+----------------------------
   1 | 2019-01-08 13:07:12.699596
@@ -105,7 +105,7 @@ highgo=# select * from test_recovery_delay ;
 (2 rows)
 
 -- standby
-highgo=# \d
+postgres=# \d
                    List of relations
  Schema |           Name           |   Type   |  Owner  
 --------+--------------------------+----------+---------
@@ -116,7 +116,7 @@ highgo=# \d
 
 -- 等五分钟
 
-highgo=# \d
+postgres=# \d
                    List of relations
  Schema |           Name           |   Type   |  Owner  
 --------+--------------------------+----------+---------
@@ -133,7 +133,7 @@ highgo=# \d
 # standby
 [yangjie@young-90 bin]$ ./repmgr node status
 Node "young-90":
-	HighGo Database version: 5.1.0
+	postgres Database version: 5.1.0
 	Total data size: 397 MB
 	Conninfo: host=young-90 user=repmgr dbname=repmgr connect_timeout=2
 	Role: standby
@@ -175,9 +175,156 @@ replication_lag_time       | 392
 receiving_streamed_wal     | t
 ```
 
-##### 基于时间点恢复
+##### 基于时间点恢复（RITR）
 
+```shell
+# primary
+# postgresql.conf
+archive_mode = on
+archive_command = 'ssh young-90 test ! -f /work/pgsql/pgsql-11-stable/archives/%f && scp %p young-90:/work/pgsql/pgsql-11-stable/archives/%f'
+```
 
+创建表添加几条测试数据。
+
+正常情况下，wal日志段在达到16M后会自动归档，由于测试我们使用手动切换归档。 
+
+```sql
+-- primary
+postgres=# create table test_pitr(id int, ts timestamp);
+CREATE TABLE
+postgres=# select pg_switch_wal();
+ pg_switch_wal 
+---------------
+ 0/3017568
+(1 row)
+
+postgres=# insert into test_pitr values (1, now());
+INSERT 0 1
+postgres=# insert into test_pitr values (2, now());
+INSERT 0 1
+postgres=# select * from test_pitr ;
+ id |             ts             
+----+----------------------------
+  1 | 2019-01-08 14:22:57.734731
+  2 | 2019-01-08 14:23:00.598715
+(2 rows)
+
+postgres=# select pg_switch_wal();
+ pg_switch_wal 
+---------------
+ 0/4000190
+(1 row)
+
+postgres=# insert into test_pitr values (3, now());
+INSERT 0 1
+postgres=# insert into test_pitr values (4, now());
+INSERT 0 1
+postgres=# select * from test_pitr ;
+ id |             ts             
+----+----------------------------
+  1 | 2019-01-08 14:22:57.734731
+  2 | 2019-01-08 14:23:00.598715
+  3 | 2019-01-08 14:23:29.175027
+  4 | 2019-01-08 14:23:32.25439
+(4 rows)
+postgres=# select pg_switch_wal();
+ pg_switch_wal 
+---------------
+ 0/5000190
+(1 row)
+
+postgres=# insert into test_pitr values (5, now());
+INSERT 0 1
+postgres=# insert into test_pitr values (6, now());
+INSERT 0 1
+postgres=# select * from test_pitr ;
+ id |             ts             
+----+----------------------------
+  1 | 2019-01-08 14:22:57.734731
+  2 | 2019-01-08 14:23:00.598715
+  3 | 2019-01-08 14:23:29.175027
+  4 | 2019-01-08 14:23:32.25439
+  5 | 2019-01-08 14:26:57.560111
+  6 | 2019-01-08 14:27:01.015577
+(6 rows)
+
+postgres=# select pg_switch_wal();
+ pg_switch_wal 
+---------------
+ 0/6000358
+(1 row)
+```
+
+正常情况下，wal日志段在达到16M后会自动归档，由于测试我们使用手动切换归档。 
+
+```shell
+# standby
+ll archives/
+total 98308
+-rw------- 1 yangjie yangjie 16777216 Jan  8 14:21 000000010000000000000001
+-rw------- 1 yangjie yangjie 16777216 Jan  8 14:21 000000010000000000000002
+-rw------- 1 yangjie yangjie      330 Jan  8 14:21 000000010000000000000002.00000028.backup
+-rw------- 1 yangjie yangjie 16777216 Jan  8 14:22 000000010000000000000003
+-rw------- 1 yangjie yangjie 16777216 Jan  8 14:23 000000010000000000000004
+-rw------- 1 yangjie yangjie 16777216 Jan  8 14:23 000000010000000000000005
+-rw------- 1 yangjie yangjie 16777216 Jan  8 14:27 000000010000000000000006
+```
+
+修改备库配置文件
+
+```shell
+# standby 
+# recovery.conf
+standby_mode = 'off'
+primary_conninfo = 'host=''young-91'' user=repmgr application_name=young90 connect_timeout=2'
+recovery_target_time = '2019-01-08 14:26:00'
+restore_command = 'cp /work/pgsql/pgsql-11-stable/archives/%f %p'
+
+# postgresql.conf
+#archive_mode = on
+#archive_command = 'ssh young-90 test ! -f /work/pgsql/pgsql-11-stable/archives/%f && scp %p young-90:/work/pgsql/pgsql-11-stable/archives/%f'
+```
+
+重启备库
+
+会进行PITR恢复到指定的时间点
+
+```shell
+# standby
+[yangjie@young-90 bin]$ ./pg_ctl -D ../data/ start
+waiting for server to start....
+2019-01-08 14:29:33.364 CST [24910] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2019-01-08 14:29:33.364 CST [24910] LOG:  listening on IPv6 address "::", port 5432
+2019-01-08 14:29:33.366 CST [24910] LOG:  listening on Unix socket "/tmp/.s.PGSQL.5432"
+2019-01-08 14:29:33.385 CST [24911] LOG:  database system was interrupted while in recovery at log time 2019-01-08 14:21:30 CST
+2019-01-08 14:29:33.385 CST [24911] HINT:  If this has occurred more than once some data might be corrupted and you might need to choose an earlier recovery target.
+2019-01-08 14:29:33.556 CST [24911] LOG:  starting point-in-time recovery to 2019-01-08 14:26:00+08
+2019-01-08 14:29:33.570 CST [24911] LOG:  restored log file "000000010000000000000002" from archive
+2019-01-08 14:29:33.585 CST [24911] LOG:  redo starts at 0/2000028
+2019-01-08 14:29:33.599 CST [24911] LOG:  restored log file "000000010000000000000003" from archive
+2019-01-08 14:29:33.630 CST [24911] LOG:  restored log file "000000010000000000000004" from archive
+2019-01-08 14:29:33.662 CST [24911] LOG:  restored log file "000000010000000000000005" from archive
+2019-01-08 14:29:33.694 CST [24911] LOG:  restored log file "000000010000000000000006" from archive
+2019-01-08 14:29:33.709 CST [24911] LOG:  consistent recovery state reached at 0/6000060
+2019-01-08 14:29:33.709 CST [24911] LOG:  recovery stopping before commit of transaction 584, time 2019-01-08 14:26:57.560463+08
+2019-01-08 14:29:33.709 CST [24911] LOG:  recovery has paused
+2019-01-08 14:29:33.709 CST [24911] HINT:  Execute pg_wal_replay_resume() to continue.
+2019-01-08 14:29:33.709 CST [24910] LOG:  database system is ready to accept read only connections
+ done
+server started
+[yangjie@young-90 bin]$ ./psql postgres
+psql (11.1)
+Type "help" for help.
+
+postgres=# select * from test_pitr;
+ id |             ts             
+----+----------------------------
+  1 | 2019-01-08 14:22:57.734731
+  2 | 2019-01-08 14:23:00.598715
+  3 | 2019-01-08 14:23:29.175027
+  4 | 2019-01-08 14:23:32.25439
+(4 rows)
+```
 
 ##### 闪回查询
 
@@ -185,4 +332,6 @@ receiving_streamed_wal     | t
 
 #### 相关链接
 
-https://www.postgresql.org/docs/11/standby-settings.html
+https://www.postgresql.org/docs/current/standby-settings.html
+
+https://www.postgresql.org/docs/current/continuous-archiving.html
