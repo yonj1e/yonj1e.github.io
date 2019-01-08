@@ -1,6 +1,6 @@
 ---
 title: 浅谈数据库误操作恢复
-date: 2018-12-12
+date: 2018-12-29
 categories: 
   - [PostgreSQL - 最佳实践]
 tags: 
@@ -71,16 +71,16 @@ recovery_min_apply_delay （integer）
  ID | Name     | Role    | Status    | Upstream | Location | Replication lag | Last replayed LSN
 ----+----------+---------+-----------+----------+----------+-----------------+-------------------
  1  | young-91 | primary | * running |          | default  | n/a             | none             
- 2  | young-90 | standby |   running | young-91 | default  | 0 bytes         | 0/20235CF0
+ 2  | young-90 | stANDby |   running | young-91 | default  | 0 bytes         | 0/20235CF0
  
-# standby
+# stANDby
 [yangjie@young-90 bin] ./repmgr cluster show
  ID | Name     | Role    | Status    | Upstream | Location | Replication lag | Last replayed LSN
 ----+----------+---------+-----------+----------+----------+-----------------+-------------------
  1  | young-91 | primary | * running |          | default  | n/a             | none             
- 2  | young-90 | standby |   running | young-91 | default  | 0 bytes         | 0/20235CF0  
+ 2  | young-90 | stANDby |   running | young-91 | default  | 0 bytes         | 0/20235CF0  
 [yangjie@young-90 bin]$ cat ../data/recovery.conf 
-standby_mode = 'on'
+stANDby_mode = 'on'
 primary_conninfo = 'host=''young-91'' user=repmgr connect_timeout=2 fallback_application_name=repmgr application_name=''young-90'''
 recovery_target_timeline = 'latest'
 recovery_min_apply_delay = 5min
@@ -91,27 +91,27 @@ recovery_min_apply_delay = 5min
 ```sql
 -- primary
 -- 主节点创建表并插入几条测试数据
-postgres=# create table test_recovery_delay(id int, ts timestamp);
+postgres=# CREATE TABLE test_recovery_delay(id int, ts timestamp);
 CREATE TABLE
-postgres=# insert into test_recovery_delay values (1,now());
+postgres=# INSERT INTO test_recovery_delay VALUES (1,now());
 INSERT 0 1
-postgres=# insert into test_recovery_delay values (2,now());
+postgres=# INSERT INTO test_recovery_delay VALUES (2,now());
 INSERT 0 1
-postgres=# select * from test_recovery_delay ;
+postgres=# SELECT * FROM test_recovery_delay ;
  id |             ts             
 ----+----------------------------
   1 | 2019-01-08 13:07:12.699596
   2 | 2019-01-08 13:07:16.291744
 (2 rows)
 
--- standby
+-- stANDby
 postgres=# \d
                    List of relations
  Schema |           Name           |   Type   |  Owner  
 --------+--------------------------+----------+---------
- public | t_test                   | table    | yangjie
+ public | t_test                   | TABLE    | yangjie
  public | t_test_id_seq            | sequence | yangjie
- public | test                     | table    | yangjie
+ public | test                     | TABLE    | yangjie
 (3 rows)
 
 -- 等五分钟
@@ -120,25 +120,25 @@ postgres=# \d
                    List of relations
  Schema |           Name           |   Type   |  Owner  
 --------+--------------------------+----------+---------
- public | t_test                   | table    | yangjie
+ public | t_test                   | TABLE    | yangjie
  public | t_test_id_seq            | sequence | yangjie
- public | test                     | table    | yangjie
- public | test_recovery_delay      | table    | yangjie
+ public | test                     | TABLE    | yangjie
+ public | test_recovery_delay      | TABLE    | yangjie
 (4 rows)
 ```
 
 也可以通过 repmgr node status 查看Last received LSN，Last replayed LSN，Replication lag等信息：
 
 ```shell
-# standby
+# stANDby
 [yangjie@young-90 bin]$ ./repmgr node status
 Node "young-90":
 	postgres Database version: 5.1.0
 	Total data size: 397 MB
 	Conninfo: host=young-90 user=repmgr dbname=repmgr connect_timeout=2
-	Role: standby
+	Role: stANDby
 	WAL archiving: off
-	Archive command: (none)
+	Archive commAND: (none)
 	Replication connections: 0 (of maximal 10)
 	Replication slots: 0 (of maximal 10)
 	Upstream node: young-91 (ID: 1)
@@ -181,7 +181,7 @@ receiving_streamed_wal     | t
 # primary
 # postgresql.conf
 archive_mode = on
-archive_command = 'ssh young-90 test ! -f /work/pgsql/pgsql-11-stable/archives/%f && scp %p young-90:/work/pgsql/pgsql-11-stable/archives/%f'
+archive_commAND = 'ssh young-90 test ! -f /work/pgsql/pgsql-11-sTABLE/archives/%f && scp %p young-90:/work/pgsql/pgsql-11-sTABLE/archives/%f'
 ```
 
 创建表添加几条测试数据。
@@ -190,36 +190,36 @@ archive_command = 'ssh young-90 test ! -f /work/pgsql/pgsql-11-stable/archives/%
 
 ```sql
 -- primary
-postgres=# create table test_pitr(id int, ts timestamp);
+postgres=# CREATE TABLE test_pitr(id int, ts timestamp);
 CREATE TABLE
-postgres=# select pg_switch_wal();
+postgres=# SELECT pg_switch_wal();
  pg_switch_wal 
 ---------------
  0/3017568
 (1 row)
 
-postgres=# insert into test_pitr values (1, now());
+postgres=# INSERT INTO test_pitr VALUES (1, now());
 INSERT 0 1
-postgres=# insert into test_pitr values (2, now());
+postgres=# INSERT INTO test_pitr VALUES (2, now());
 INSERT 0 1
-postgres=# select * from test_pitr ;
+postgres=# SELECT * FROM test_pitr ;
  id |             ts             
 ----+----------------------------
   1 | 2019-01-08 14:22:57.734731
   2 | 2019-01-08 14:23:00.598715
 (2 rows)
 
-postgres=# select pg_switch_wal();
+postgres=# SELECT pg_switch_wal();
  pg_switch_wal 
 ---------------
  0/4000190
 (1 row)
 
-postgres=# insert into test_pitr values (3, now());
+postgres=# INSERT INTO test_pitr VALUES (3, now());
 INSERT 0 1
-postgres=# insert into test_pitr values (4, now());
+postgres=# INSERT INTO test_pitr VALUES (4, now());
 INSERT 0 1
-postgres=# select * from test_pitr ;
+postgres=# SELECT * FROM test_pitr ;
  id |             ts             
 ----+----------------------------
   1 | 2019-01-08 14:22:57.734731
@@ -227,17 +227,17 @@ postgres=# select * from test_pitr ;
   3 | 2019-01-08 14:23:29.175027
   4 | 2019-01-08 14:23:32.25439
 (4 rows)
-postgres=# select pg_switch_wal();
+postgres=# SELECT pg_switch_wal();
  pg_switch_wal 
 ---------------
  0/5000190
 (1 row)
 
-postgres=# insert into test_pitr values (5, now());
+postgres=# INSERT INTO test_pitr VALUES (5, now());
 INSERT 0 1
-postgres=# insert into test_pitr values (6, now());
+postgres=# INSERT INTO test_pitr VALUES (6, now());
 INSERT 0 1
-postgres=# select * from test_pitr ;
+postgres=# SELECT * FROM test_pitr ;
  id |             ts             
 ----+----------------------------
   1 | 2019-01-08 14:22:57.734731
@@ -248,7 +248,7 @@ postgres=# select * from test_pitr ;
   6 | 2019-01-08 14:27:01.015577
 (6 rows)
 
-postgres=# select pg_switch_wal();
+postgres=# SELECT pg_switch_wal();
  pg_switch_wal 
 ---------------
  0/6000358
@@ -258,7 +258,7 @@ postgres=# select pg_switch_wal();
 正常情况下，wal日志段在达到16M后会自动归档，由于测试我们使用手动切换归档。 
 
 ```shell
-# standby
+# stANDby
 ll archives/
 total 98308
 -rw------- 1 yangjie yangjie 16777216 Jan  8 14:21 000000010000000000000001
@@ -273,16 +273,16 @@ total 98308
 修改备库配置文件
 
 ```shell
-# standby 
+# stANDby 
 # recovery.conf
-standby_mode = 'off'
+stANDby_mode = 'off'
 primary_conninfo = 'host=''young-91'' user=repmgr application_name=young90 connect_timeout=2'
 recovery_target_time = '2019-01-08 14:26:00'
-restore_command = 'cp /work/pgsql/pgsql-11-stable/archives/%f %p'
+restore_commAND = 'cp /work/pgsql/pgsql-11-sTABLE/archives/%f %p'
 
 # postgresql.conf
 #archive_mode = on
-#archive_command = 'ssh young-90 test ! -f /work/pgsql/pgsql-11-stable/archives/%f && scp %p young-90:/work/pgsql/pgsql-11-stable/archives/%f'
+#archive_commAND = 'ssh young-90 test ! -f /work/pgsql/pgsql-11-sTABLE/archives/%f && scp %p young-90:/work/pgsql/pgsql-11-sTABLE/archives/%f'
 ```
 
 重启备库
@@ -290,21 +290,21 @@ restore_command = 'cp /work/pgsql/pgsql-11-stable/archives/%f %p'
 会进行PITR恢复到指定的时间点
 
 ```shell
-# standby
+# stANDby
 [yangjie@young-90 bin]$ ./pg_ctl -D ../data/ start
 waiting for server to start....
 2019-01-08 14:29:33.364 CST [24910] LOG:  listening on IPv4 address "0.0.0.0", port 5432
 2019-01-08 14:29:33.364 CST [24910] LOG:  listening on IPv6 address "::", port 5432
 2019-01-08 14:29:33.366 CST [24910] LOG:  listening on Unix socket "/tmp/.s.PGSQL.5432"
 2019-01-08 14:29:33.385 CST [24911] LOG:  database system was interrupted while in recovery at log time 2019-01-08 14:21:30 CST
-2019-01-08 14:29:33.385 CST [24911] HINT:  If this has occurred more than once some data might be corrupted and you might need to choose an earlier recovery target.
+2019-01-08 14:29:33.385 CST [24911] HINT:  If this has occurred more than once some data might be corrupted AND you might need to choose an earlier recovery target.
 2019-01-08 14:29:33.556 CST [24911] LOG:  starting point-in-time recovery to 2019-01-08 14:26:00+08
-2019-01-08 14:29:33.570 CST [24911] LOG:  restored log file "000000010000000000000002" from archive
+2019-01-08 14:29:33.570 CST [24911] LOG:  restored log file "000000010000000000000002" FROM archive
 2019-01-08 14:29:33.585 CST [24911] LOG:  redo starts at 0/2000028
-2019-01-08 14:29:33.599 CST [24911] LOG:  restored log file "000000010000000000000003" from archive
-2019-01-08 14:29:33.630 CST [24911] LOG:  restored log file "000000010000000000000004" from archive
-2019-01-08 14:29:33.662 CST [24911] LOG:  restored log file "000000010000000000000005" from archive
-2019-01-08 14:29:33.694 CST [24911] LOG:  restored log file "000000010000000000000006" from archive
+2019-01-08 14:29:33.599 CST [24911] LOG:  restored log file "000000010000000000000003" FROM archive
+2019-01-08 14:29:33.630 CST [24911] LOG:  restored log file "000000010000000000000004" FROM archive
+2019-01-08 14:29:33.662 CST [24911] LOG:  restored log file "000000010000000000000005" FROM archive
+2019-01-08 14:29:33.694 CST [24911] LOG:  restored log file "000000010000000000000006" FROM archive
 2019-01-08 14:29:33.709 CST [24911] LOG:  consistent recovery state reached at 0/6000060
 2019-01-08 14:29:33.709 CST [24911] LOG:  recovery stopping before commit of transaction 584, time 2019-01-08 14:26:57.560463+08
 2019-01-08 14:29:33.709 CST [24911] LOG:  recovery has paused
@@ -316,7 +316,7 @@ server started
 psql (11.1)
 Type "help" for help.
 
-postgres=# select * from test_pitr;
+postgres=# SELECT * FROM test_pitr;
  id |             ts             
 ----+----------------------------
   1 | 2019-01-08 14:22:57.734731
@@ -328,10 +328,150 @@ postgres=# select * from test_pitr;
 
 ##### 闪回查询
 
+闪回查询
+
+```sql
+INSERT INTO test VALUES (1, 'jinan', now());
+INSERT 0 1
+SELECT xmin,xmax,* FROM test ;
+ xmin | xmax | id |  tx   |             ts             
+------+------+----+-------+----------------------------
+  638 |    0 |  1 | jinan | 2018-07-26 11:12:09.749414
+(1 row)
+
+update test SET tx = 'hangzhou', ts = now() WHERE id = 1;
+UPDATE 1
+SELECT xmin,xmax,* FROM test ;
+ xmin | xmax | id |    tx    |            ts             
+------+------+----+----------+---------------------------
+  639 |    0 |  1 | hangzhou | 2018-07-26 11:12:26.66156
+(1 row)
+
+update test SET tx = 'beijing', ts = now() WHERE id = 1;
+UPDATE 1
+SELECT xmin,xmax,* FROM test ;
+ xmin | xmax | id |   tx    |             ts             
+------+------+----+---------+----------------------------
+  640 |    0 |  1 | beijing | 2018-07-26 11:12:36.117637
+(1 row)
+
+-- 指定时间点闪回查询
+SELECT * FROM test AS OF TIMESTAMP '2018-07-26 11:12:10';
+ id |  tx   |             ts             
+----+-------+----------------------------
+  1 | jinan | 2018-07-26 11:12:09.749414
+(1 row)
+
+SELECT * FROM test AS OF TIMESTAMP '2018-07-26 11:12:30';
+ id |    tx    |            ts             
+----+----------+---------------------------
+  1 | hangzhou | 2018-07-26 11:12:26.66156
+(1 row)
+
+-- 指定事务号闪回查询
+SELECT * FROM test AS OF XID 638;
+ id |  tx   |             ts             
+----+-------+----------------------------
+  1 | jinan | 2018-07-26 11:12:09.749414
+(1 row)
+
+SELECT * FROM test AS OF XID 639;
+ id |    tx    |            ts             
+----+----------+---------------------------
+  1 | hangzhou | 2018-07-26 11:12:26.66156
+(1 row)
+```
+
+闪回版本查询
+
+```sql
+-- 指定时间段闪回版本查询
+SELECT * FROM test 
+VERSIONS BETWEEN TIMESTAMP 
+	'2018-07-26 11:12:05' 
+	AND '2018-07-26 11:12:40' 
+WHERE id = 1;
+ id |    tx    |             ts             
+----+----------+----------------------------
+  1 | jinan    | 2018-07-26 11:12:09.749414
+  1 | hangzhou | 2018-07-26 11:12:26.66156
+  1 | beijing  | 2018-07-26 11:12:36.117637
+(3 rows)
+
+SELECT * FROM test 
+VERSIONS BETWEEN TIMESTAMP 
+	'2018-07-26 11:12:05' 
+	AND '2018-07-26 11:12:30' 
+WHERE id = 1;
+ id |    tx    |             ts             
+----+----------+----------------------------
+  1 | jinan    | 2018-07-26 11:12:09.749414
+  1 | hangzhou | 2018-07-26 11:12:26.66156
+(2 rows)
+
+-- 指定事务号闪回版本查询
+SELECT * FROM test 
+VERSIONS BETWEEN XID  
+	638 AND 640 
+WHERE id = 1;
+ id |    tx    |             ts             
+----+----------+----------------------------
+  1 | jinan    | 2018-07-26 11:12:09.749414
+  1 | hangzhou | 2018-07-26 11:12:26.66156
+  1 | beijing  | 2018-07-26 11:12:36.117637
+(3 rows)
+
+SELECT * FROM test 
+VERSIONS BETWEEN XID
+	638 AND 639 
+WHERE id = 1;
+ id |    tx    |             ts             
+----+----------+----------------------------
+  1 | jinan    | 2018-07-26 11:12:09.749414
+  1 | hangzhou | 2018-07-26 11:12:26.66156
+(2 rows)
+
+-- 一个事务中多次修改
+SELECT xmin,xmax,* FROM test;
+ xmin | xmax | id |   tx    |             ts             
+------+------+----+---------+----------------------------
+  648 |    0 |  1 | beijing | 2018-07-26 13:35:24.015878
+(1 row)
+
+begin;
+BEGIN
+update test SET tx = 'jinan' WHERE id = 1;
+UPDATE 1
+update test SET tx = 'hangzhou' WHERE id = 1;
+UPDATE 1
+COMMIT;
+COMMIT
+SELECT xmin,xmax,* FROM test;
+ xmin | xmax | id |    tx    |             ts             
+------+------+----+----------+----------------------------
+  649 |    0 |  1 | hangzhou | 2018-07-26 13:35:24.015878
+(1 row)
+
+SELECT xmin,xmax,* FROM test 
+VERSIONS BETWEEN TIMESTAMP
+	'2018-07-26 13:35:00' 
+	AND '2018-07-26 13:37:00';
+ xmin | xmax | id |    tx    |             ts             
+------+------+----+----------+----------------------------
+  648 |  649 |  1 | beijing  | 2018-07-26 13:35:24.015878
+  649 |    0 |  1 | hangzhou | 2018-07-26 13:35:24.015878
+(2 rows)
+-- jinan并不是一个版本，因为没有提交
+```
+
 
 
 #### 相关链接
 
-https://www.postgresql.org/docs/current/standby-settings.html
+https://repmgr.org/
+
+https://www.postgresql.org/docs/current/stANDby-SETtings.html
 
 https://www.postgresql.org/docs/current/continuous-archiving.html
+
+https://www.postgresql.org/message-id/88AAF14A-0D49-4538-9C63-58535CF6686C@highgo.com
