@@ -717,7 +717,7 @@ ALTER TABLE scott.dept_test FLASHBACK ARCHIVE fda1;
 
 ### 闪回数据库
 
-![flashback-database](2018-07-01-Oracle-Flashback/fb-01.png?raw=true)
+![flashback-database](oracle-flashback/fb-01.png?raw=true)
 
 当启用闪回数据库，在SGA中会多出一块内存-闪回缓冲区，用于存放闪回数据，在buffer cache中，每个数据库更改，都会以log record的方式记录到log buffer，然后通过后台进程LGWR写入到磁盘 online log group，而buffer cache中的更改也会记录到flashback buffer，但并不是每一个更改都记录，只是记录部分更改，然后通过后台进程RVWR写入磁盘flashback log
 
@@ -1042,7 +1042,7 @@ alter system dump logfile '+DATA/orcl/onlinelog/group_1.261.867775175';
 
 ### 闪回删除
 
-![flashback-drop](2018-07-01-Oracle-Flashback/fb-02.png?raw=true)
+![flashback-drop](oracle-flashback/fb-02.png?raw=true)
 
 Oracle中回收站类似windows中的回收站，其空间大小受限于数据文件剩余空间
 
@@ -1052,7 +1052,7 @@ Oracle中回收站类似windows中的回收站，其空间大小受限于数据�
 
 ### 闪回数据归档
 
-![flashback-recall](2018-07-01-Oracle-Flashback/fb-03.png?raw=true)
+![flashback-recall](oracle-flashback/fb-03.png?raw=true)
 
 闪回数据归档可自动分区及压缩，且根据保留册率自动清除
 

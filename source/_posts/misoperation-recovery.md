@@ -2,7 +2,7 @@
 title: 浅谈数据库误操作恢复
 date: 2018-12-29
 categories: 
-  - [PostgreSQL - 最佳实践]
+  - [PostgreSQL]
 tags: 
   - RITR
   - Flashback
@@ -470,7 +470,7 @@ VERSIONS BETWEEN TIMESTAMP
 
 https://repmgr.org/
 
-https://www.postgresql.org/docs/current/stANDby-SETtings.html
+https://www.postgresql.org/docs/current/standby-settings.html
 
 https://www.postgresql.org/docs/current/continuous-archiving.html
 
