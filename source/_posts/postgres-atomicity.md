@@ -47,7 +47,7 @@ Unfortunately, the new implementation is immediately plagued by problems that se
 
 不幸的是，新的实现立即受到问题的困扰，当两个客户机同时试图访问数据时，这些问题似乎尤其明显。一个人打开CSV文件，读取、修改和写入一些数据，但是这个更改立即遭到另一个尝试执行相同操作的客户端破坏。
 
-![img](2018-09-20-postgres-atomicity/csv-database.svg)
+![img](postgres-atomicity/csv-database.svg)
 
 Data loss from contention between two clients.
 
@@ -150,7 +150,7 @@ Like a transaction, a tuple tracks its own `xmin`, except in the tuple’s case 
 >
 > 读者可能会注意到，虽然 `xmin` 和 `xmax` 可以很好地跟踪元组的创建和删除，但它们不足以处理更新。为了简洁起见，我现在要讨论一下更新是如何工作的。
 
-![img](2018-09-20-postgres-atomicity/heap-tuple-visibility.svg)
+![img](postgres-atomicity/heap-tuple-visibility.svg)
 
 A heap tuple's lifetime being tracked with xmin and xmax.
 
@@ -222,7 +222,7 @@ We want the results any committed transactions with `xid > xmin` to be visible, 
 
 我们希望使用 `xid > xmin` 提交的任何事务的结果都是可见的，但是任何运行中的事务的结果都是隐藏的。`*xip` 存储创建快照时处于活动状态的事务列表，以便判断哪个是哪个。
 
-![img](2018-09-20-postgres-atomicity/snapshot-creation.svg)
+![img](postgres-atomicity/snapshot-creation.svg)
 
 Transactions executing against a database and a snapshot capturing a moment in time.
 
