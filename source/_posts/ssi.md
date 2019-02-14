@@ -2,7 +2,7 @@
 title: Serializable Snapshot Isolation in PostgreSQL
 date: 2018-09-10 
 categories: 
-  - [PostgreSQL - 理论基础]
+  - [PostgreSQL]
 tags: 
   - MVCC
   - PostgreSQL
