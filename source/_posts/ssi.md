@@ -1,5 +1,5 @@
 ---
-title: Serializable Snapshot Isolation in PostgreSQL
+title: PostgreSQL中的可序列化快照隔离
 date: 2018-09-10 
 categories: 
   - [PostgreSQL]

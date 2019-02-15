@@ -1,5 +1,5 @@
 ---
-title: How Postgres Makes Transactions Atomic
+title: Postgres如何实现事务原子性
 date: 2018-09-20 
 categories: 
   - [PostgreSQL]
