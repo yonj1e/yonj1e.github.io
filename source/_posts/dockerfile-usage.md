@@ -239,7 +239,7 @@ pgsql                                     latest              c79f4b0a8f78      
 docker.io/centos                          latest              9f38484d220f        10 days ago         202 MB
 
 ```
-注意到centos的镜像其实只有200MB，仅仅编译pg竟然到了1.3GB，这就需要进一步了解dockerfile做了什么？
+注意到centos的镜像其实只有202MB，仅仅编译pg竟然到了1.38GB，这就需要进一步了解dockerfile做了什么？
 
 Dockerfile由多条指令构成，随着深入研究Dockerfile与镜像的关系，非常快大家就会发现。
 
@@ -247,10 +247,13 @@ Dockerfile中的每一条指令都会相应于Docker镜像中的一层。
 
 继续以例如以下Dockerfile为例：
 
+```
 FROM ubuntu:14.04
 ADD run.sh /
 VOLUME /data
 CMD ["./run.sh"]
+```
+
 通过docker build以上Dockerfile的时候。会在Ubuntu:14.04镜像基础上，加入三层独立的镜像，依次相应于三条不同的命令。
 
 镜像示意图例如以下：
@@ -265,13 +268,14 @@ CMD ["./run.sh"]
 
 而改动更新的情况主要有两种：
 
-1.ADD或COPY命令:ADD或者COPY的作用是在docker build构建镜像时向容器中加入内容。仅仅要内容加入成功，当前构建的那层镜像就是加入内容的大小，如以上命令ADD run.sh /。新构建的那层镜像大小为文件run.sh的大小。
+1. ADD或COPY命令：ADD或者COPY的作用是在docker build构建镜像时向容器中加入内容。仅仅要内容加入成功，当前构建的那层镜像就是加入内容的大小，如以上命令`ADD run.sh /`。新构建的那层镜像大小为文件run.sh的大小。
 
-2.RUN命令:RUN命令的作用是在当前空的镜像层内执行一条命令，倘若执行的命令须要更新磁盘文件。那么全部的更新内容都在存储在当前镜像层中。
+2. RUN命令：RUN命令的作用是在当前空的镜像层内执行一条命令，倘若执行的命令须要更新磁盘文件。那么全部的更新内容都在存储在当前镜像层中。
 
-举例说明：RUN echo DaoCloud命令不涉及文件系统内容的改动，故命令执行完之后当前镜像层的大小为0；`RUN wget http://abc.com/def.tar`命令会将压缩包下载至当前文件夹下，因此当前这一层镜像的大小为:对文件系统内容的增量改动部分，即def.tar文件的大小。
 
-再来看一下我们的镜像，我们可以清楚的发现拷贝pg源码占了900MB
+举例说明：`RUN echo DaoCloud`命令不涉及文件系统内容的改动，故命令执行完之后当前镜像层的大小为0；`RUN wget http://abc.com/def.tar`命令会将压缩包下载至当前文件夹下，因此当前这一层镜像的大小为:对文件系统内容的增量改动部分，即def.tar文件的大小。
+
+再来看一下我们的镜像，我们可以清楚的发现拷贝pg源码占了948MB
 ```
 $ docker history c79f4b0a8f78
 IMAGE               CREATED             CREATED BY                                      SIZE                COMMENT
@@ -295,6 +299,7 @@ a394918a64fd        57 minutes ago      /bin/sh -c useradd postgres             
 将下载源码，编译，删除源码放在一条命令中完成。
 
 ```
+# Dockerfile
 RUN set -eux \
         && wget https://ftp.postgresql.org/pub/source/v11.2/postgresql-11.2.tar.gz \
         && tar zxvf postgresql-11.2.tar.gz -C /opt && rm postgresql-11.2.tar.gz \
@@ -327,7 +332,7 @@ a394918a64fd        About an hour ago   /bin/sh -c useradd postgres             
 <missing>           10 days ago         /bin/sh -c #(nop)  LABEL org.label-schema....   0 B                 
 <missing>           10 days ago         /bin/sh -c #(nop) ADD file:074f2c974463ab3...   202 MB 
 ```
-镜像大小现在只有380MB。
+镜像大小现在只有383MB。
 
 #### 参考
 
