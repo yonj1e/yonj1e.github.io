@@ -9,7 +9,7 @@ date:
 
 兴趣广泛，但啥也不会 ··· ···
 
-PostgreSQL developer, @highgo
+PostgreSQL Developer & DBA, @Qunar
 
 `C` `Java` `PostgreSQL`
 
