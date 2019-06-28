@@ -35,7 +35,7 @@ It can be helpful to think of horizontal partitioning in terms of how it relates
 
 考虑水平分区与垂直分区的关系，可能会有所帮助。在垂直分区表中，整个列被分离出来并放入新的不同表中。保持在一个垂直分区内的数据独立于所有其他分区中的数据，并且每个数据都包含不同的行和列。下图说明了如何在水平和垂直方向上对表进行分区：
 
-![Example tables showing horizontal and vertical partitioning](understanding-database-sharding/DB_image_1_cropped.png)
+![Example tables showing horizontal and vertical partitioning](DB_image_1_cropped.png)
 
 Sharding involves breaking up one's data into two or more smaller chunks, called *logical shards*. The logical shards are then distributed across separate database nodes, referred to as *physical shards*, which can hold multiple logical shards. Despite this, the data held within all the shards collectively represent an entire logical dataset.
 
@@ -119,7 +119,7 @@ Once you've decided to shard your database, the next thing you need to figure ou
 
 基于键值的分片（也称为基于散列的分片）涉及使用从新写入的数据中获取的值 - 例如客户的ID号，客户端应用程序的IP地址，邮政编码等 - 并将其插入哈希函数以确定数据应该去哪个分片。哈希函数是将一段数据（例如，客户电子邮件）作为输入并输出离散值（称为哈希值）的函数。在分片的情况下，散列值是一个分片ID，用于确定传入数据将存储在哪个分片上。总而言之，这个过程看起来像这样：
 
-![Key based sharding example diagram](understanding-database-sharding/DB_image_2_cropped.png)
+![Key based sharding example diagram](DB_image_2_cropped.png)
 
 To ensure that entries are placed in the correct shards and in a consistent manner, the values entered into the hash function should all come from the same column. This column is known as a *shard key*. In simple terms, shard keys are similar to [*primary keys*](https://en.wikipedia.org/wiki/Primary_key) in that both are columns which are used to establish a unique identifier for individual rows. Broadly speaking, a shard key should be static, meaning it shouldn't contain values that might change over time. Otherwise, it would increase the amount of work that goes into update operations, and could slow down performance.
 
@@ -139,7 +139,7 @@ The main appeal of this strategy is that it can be used to evenly distribute dat
 
 基于范围的分片涉及基于给定值的范围分片数据。为了说明，假设您有一个数据库，用于存储零售商目录中所有产品的信息。您可以创建一些不同的分片，并根据每个产品的价格范围分配每个产品的信息，如下所示：
 
-![Range based sharding example diagram](understanding-database-sharding/DB_image_3_cropped.png)
+![Range based sharding example diagram](DB_image_3_cropped.png)
 
 The main benefit of range based sharding is that it's relatively simple to implement. Every shard holds a different set of data but they all have an identical schema as one another, as well as the original database. The application code just reads which range the data falls into and writes it to the corresponding shard.
 
@@ -155,7 +155,7 @@ To implement *directory based sharding*, one must create and maintain a *lookup 
 
 要实现基于目录的分片，必须创建并维护一个查找表，该查找表使用分片键来跟踪哪个分片包含哪些数据。简而言之，查找表是一个表，其中包含有关可以找到特定数据的静态信息集。下图显示了基于目录的分片的简单示例：
 
-![Directory based sharding example diagram](understanding-database-sharding/DB_image_4_cropped.png)
+![Directory based sharding example diagram](DB_image_4_cropped.png)
 
 Here, the **Delivery Zone** column is defined as a shard key. Data from the shard key is written to the lookup table along with whatever shard each respective row should be written to. This is similar to range based sharding, but instead of determining which range the shard key's data falls into, each key is tied to its own specific shard. Directory based sharding is a good choice over range based sharding in cases where the shard key has a low cardinality and it doesn't make sense for a shard to store a range of keys. Note that it's also distinct from key based sharding in that it doesn't process the shard key through a hash function; it just checks the key against a lookup table to see where the data needs to be written.
 

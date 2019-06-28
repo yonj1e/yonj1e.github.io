@@ -912,7 +912,7 @@ SELECT ... FROM parttab WHERE partkey =（SELECT ... FROM othertable WHERE ...�
 
 下图显示了PG11中的非分区表与PG10中的分区表与PG11中的分区表进行的性能对比。
 
-![partition tps](partition-in-pg11/partition_prune_bench_chart-1.png)
+![partition tps](partition_prune_bench_chart-1.png)
 
 以上基准测试出自2ndquadrant David Rowley 的博客。
 

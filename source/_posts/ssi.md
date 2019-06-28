@@ -96,7 +96,7 @@ But the interleaving of Figure 1, when executed under snapshot isolation, violat
 
 但是图1的交错(在快照隔离下执行时)违反了这种不变。这两个事务都读取了开始时拍摄的快照，显示了两个医生的随叫随到状态。看到这一点，它们都继续将Alice和Bob分别从Call状态中删除。UPDATE上的写锁不能解决这个问题，因为这两个事务修改不同的行，因此不会发生冲突。相反，在两阶段锁定DBMS中，每个事务都会采用与另一个事务的写操作相冲突的读锁。类似地，在乐观并发系统中，第二个事务将无法提交，因为它的读取集不再是最新的。
 
-![](ssi/figure1.jpg)
+![](figure1.jpg)
 
 ##### 2.1.2 Example 2: Batch ProceSSIng
 
@@ -119,7 +119,7 @@ The following useful invariant holds under serializable executions: after a REPO
 
 在可序列化执行下，以下有用的不变量保持不变：在REPORT事务显示特定批次的总计后，后续事务不能更改该总计。 这是因为REPORT显示了上一批的事务，因此它必须遵循CLOSE-BATCH事务。 每个NEW-RECEIPT事务必须在两个事务之前，使其对REPORT可见，或者遵循CLOSE-BATCH事务，在这种情况下，它将成为下一个批号的一个SSI。
 
-![](ssi/figure2.jpg)
+![](figure2.jpg)
 
 However, the interleaving shown in Figure 2 is allowed under SI, and violates this invariant. The receipt inserted by transaction $T_2$ has the previous batch number because $T_2$ starts before $T_3$ commits, but is not visible in the corresponding report produced by $T_1$. 
 
@@ -170,7 +170,7 @@ SSI takes a different approach to ensuring serializability: it runs transactions
 
 SSI采用了一种不同的方法来确保可串行化：它使用快照隔离运行事务，但添加其他检查以确定是否可能出现异常。这是基于下面讨论的快照隔离异常的理论。SSI之所以对我们有吸引力，是因为它构建在快照隔离之上，并且提供了比S2PL实现更高的性能。另一个重要因素是SSI不需要任何额外的阻塞。可能违反可串行化性的事务只会被终止。由于更新冲突，基本快照隔离已经可以回滚事务，因此用户必须已经准备好处理串行化失败导致的事务中止，例如使用自动重试事务的中间件层。
 
-![](ssi/figure3.jpg)
+![](figure3.jpg)
 
 The remainder of this section reviews the previous work on SSI. Sections 3.1 and 3.2 review the theory of snapshot isolation anomalies and when they arise. Section 3.3 describes the SSI algorithm and some proposed variants on it.
 
@@ -568,7 +568,7 @@ Our discuSSIon of predicate locking has focused mainly on B+-trees, the most com
 
 我们对谓词锁定的讨论主要集中在B+-树这一最常见的索引类型上.。PostgreSQL提供了其他几种内置索引，包括GIST[13]和GIN索引，并支持可扩展的索引API，允许用户定义自己的索引访问方法[20]。通常，新的索引访问方法必须指明它们是否支持谓词锁定；如果支持，则需要它们获得适当的SIREAD锁，以避免出现幻觉。否则，PostgreSQL在每次访问索引时都依赖于获取关系级锁。
 
-![](ssi/figure4.jpg)
+![](figure4.jpg)
 
 Of PostgreSQL’s built-in index access methods, currently only B+-trees support predicate locking. We plan to add support for GIST indexes in an upcoming release, following a similar approach; the major difference is that GIST indexes must lock internal nodes in the tree, while B+-tree indexes only lock leaf pages. Support for GIN and hash indexes is also planned.
 
@@ -610,7 +610,7 @@ The standard TPC-C workload mix consists of 8% read-only transactions. To gain f
 
 标准的TPC-C工作负载组合由8%的只读事务组成.。为了获得更深入的了解，我们扩展了工作负载组合，以包含只读事务的不同部分，在其他方面保持相同的事务比例。我们分别在内存中和磁盘绑定的工作负载上使用了4个线程和36个线程的并发级别，因为它们获得了最高的性能。我们在没有思考时间的情况下运行了基准测试，并测量了最终的吞吐量，如图5所示。同样，SSI和S2PL的性能与快照隔离的性能相关。
 
-![](ssi/figure5.jpg)
+![](figure5.jpg)
 
 For the in-memory configuration (Figure 5a), SSI causes a 5% slowdown relative to snapshot isolation because of increased CPU usage. Our read-only optimizations reduce the CPU overhead of SSI for workloads with mostly read-only transactions. SSI outperforms S2PL for all transaction mixes, and does so by a significant margin when the fraction of read-only transactions is high. On these workloads, there are more rw-conflicts between concurrent transactions, so locking imposes a larger performance penalty. (The 100%-readonly workload is a special case; there are no lock conflicts under S2PL, and SSI has no overhead because all snapshots are safe.) The 150-warehouse configuration (Figure 5b) behaves similarly, but the differences are less pronounced: on this disk-bound benchmark, CPU overhead is not a factor, and improved concurrency has a limited benefit. Here, the performance of SSI is indistinguishable from that of SI. Transactions rarely need to be retried; in all cases, the serialization failure rate was under 0.25%.
 
@@ -629,7 +629,7 @@ The RUBiS workload contains frequent rw-conflicts. For example, queries that lis
 
 RUBiS工作负载包含频繁的rw-conflicts。例如，列出特定类别中所有项目的当前投标的查询与对这些项目的投标请求相冲突。因此，两阶段锁定会从锁争用中产生很大的开销，如图6所示。此外，有时还会发生死锁，这需要进行昂贵的死锁检测，并导致串行化失败。SSI的性能可与快照隔离相媲美，因为危险结构很少，因此事务很少被中止。
 
-![](ssi/figure6.jpg)
+![](figure6.jpg)
 
 #### 8.4 Deferrable Transactions
 In Section 4.3, we introduced deferrable transactions. Aimed at long-running analytic queries, this feature allows transactions to avoid the overhead of SSI by running them under snapshot isolation on a safe snapshot. The tradeoff is that these transactions may have to wait until a safe snapshot is detected.

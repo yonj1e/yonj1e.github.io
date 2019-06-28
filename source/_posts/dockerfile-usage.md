@@ -258,7 +258,7 @@ CMD ["./run.sh"]
 
 镜像示意图例如以下：
 
-![](dockerfile-usage/docker-images-layer.png)
+![](docker-images-layer.png)
 
 有了Dockerfile与镜像关系的初步认识之后，我们再进一步联系到每一层镜像的大小。
 
