@@ -285,6 +285,53 @@ test=# explain analyze select data_id from test_tbl where status=0 and city_id=3
 (7 rows)
 ```
 
+## 其他
+
+带IN条件的联合索引失效
+
+```sql
+test=# select city_id from test_tbl limit 5;
+ city_id 
+---------
+  299782
+  300002
+  298051
+  298051
+  298051
+(5 rows)
+
+test=# explain analyze select data_id from test_tbl where status=0 and city_id in (310188, 299782) and type=103 and sub_type in(10306,10304,10305) order by create_time desc limit 1;
+                                                                                QUERY PLAN                                                                                 
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.44..116.29 rows=1 width=16) (actual time=0.082..0.082 rows=1 loops=1)
+   ->  Index Scan Backward using test_tbl_create_time_idx on test_tbl  (cost=0.44..1937727.22 rows=16726 width=16) (actual time=0.082..0.082 rows=1 loops=1)
+         Filter: ((city_id = ANY ('{310188,299782}'::integer[])) AND (status = 0) AND (type = 103) AND (sub_type = ANY ('{10306,10304,10305}'::integer[])))
+         Rows Removed by Filter: 37
+ Planning time: 0.542 ms
+ Execution time: 0.111 ms
+(6 rows)
+
+# 带IN条件的联合索引失效
+test=# select min(city_id), max(city_id) from test_tbl;
+ min |   max   
+-----+---------
+   0 | 1800000
+(1 row)
+
+test=# explain analyze select data_id from test_tbl where status=0 and city_id in (310188,1800001) and type=103 and sub_type in(10306,10304,10305) order by create_time desc limit 1;
+                                                                                    QUERY PLAN                                                                                    
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.44..1652.38 rows=1 width=16) (actual time=13331.682..13331.683 rows=1 loops=1)
+   ->  Index Scan Backward using test_tbl_create_time_idx on test_tbl  (cost=0.44..1937727.22 rows=1173 width=16) (actual time=13331.681..13331.681 rows=1 loops=1)
+         Filter: ((city_id = ANY ('{310188,1800001}'::integer[])) AND (status = 0) AND (type = 103) AND (sub_type = ANY ('{10306,10304,10305}'::integer[])))
+         Rows Removed by Filter: 10007847
+ Planning time: 0.375 ms
+ Execution time: 13331.702 ms
+(6 rows)
+```
+
+
+
 ## 参考
 
 https://yq.aliyun.com/articles/647456
