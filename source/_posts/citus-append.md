@@ -2,7 +2,7 @@
 title: Citus中的分片策略:追加分配
 date: 2019-02-14
 categories: 
-  - [PostgreSQL]
+  - [Citus]
 tags: 
   - Citus
   - PostgreSQL
