@@ -29,7 +29,7 @@ coordinator节点收到用户SQL请求后，首先将用户的SQL请求拆分成
 
 架构如下：
 
-![img](./imgs/citus-query-processing.png)
+![img](citus-query-processing/citus-query-processing.png)
 
 蓝色为citus插件加的功能，黄色为postgreSQL自带的功能。
 
