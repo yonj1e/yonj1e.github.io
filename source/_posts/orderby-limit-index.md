@@ -4,10 +4,7 @@ date: 2019-06-27
 categories: 
   - [PostgreSQL]
 tags: 
-  - PostgreSQL
   - Order By
-  - Limit
-  - Index
 ---
 
 ## 简介

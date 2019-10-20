@@ -5,8 +5,6 @@ categories:
   - [PostgreSQL]
 tags: 
   - PITR
-  - Flashback
-  - PostgreSQL
 ---
 
 

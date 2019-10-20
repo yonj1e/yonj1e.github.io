@@ -4,8 +4,7 @@ date: 2017-08-11
 categories: 
   - [PostgreSQL]
 tags: 
-  - PostgreSQL
-  - Partition
+  - Hash Partition
 ---
 
 
@@ -27,7 +26,6 @@ tags:
 建表语法
 
 ```sql
-
 yonj1e=# create table h (h_id int, h_name name, h_date date) partition by hash(h_id);
 CREATE TABLE
 yonj1e=# create table h1 partition of h;
@@ -38,7 +36,6 @@ yonj1e=# create table h3 partition of h;
 CREATE TABLE
 yonj1e=# create table h4 partition of h;
 CREATE TABLE
-
 ```
 建主表的语法与range/list分区一样，只有类型差别。
 
@@ -314,7 +311,7 @@ Partition of: h SERIAL NUMBER 1
 Partition constraint: (id IS NOT NULL)
 ```
 不支持 attach、detach
-```
+```sql
 postgres=# create table h3 (id int);
 CREATE TABLE
 postgres=# alter table h attach partition h3;
