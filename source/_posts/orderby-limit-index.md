@@ -191,7 +191,7 @@ test=#  explain analyze select data_id from test_tbl where status=0 and city_id=
 
 ## 优化方法
 
-#### 改SQL
+### 改SQL
 
 a 强制不走cretate_time扫描
 
@@ -233,7 +233,7 @@ select data_id from cte limit 1;
 (12 rows)
 ```
 
-#### 加多列复合索引
+### 加多列复合索引
 
 加到哪几个字段是关键
 

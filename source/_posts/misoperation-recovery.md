@@ -5,13 +5,14 @@ categories:
   - [PostgreSQL]
 tags: 
   - PITR
+ - Flashback
 ---
 
 
 
 在使用数据库的过程中，不管是业务开发者还是运维人员，都有可能对数据库进行误操作，比如全表不带条件的update或delete等。
 
-#### 恢复措施
+## 恢复措施
 
 误操作之后又有哪些补救措施呢？
 
@@ -19,7 +20,7 @@ tags:
 - 基于时间点恢复（PITR）：使用由连续归档功能创建的基础备份和归档日志将数据库群恢复到任何时间点的功能。
 - 闪回方案：是成本最低的一种方式，能够有效的、快速地处理一些数据库误操作等。
 
-#### 闪回方案
+## 闪回方案
 
 闪回技术与介质恢复相比，在易用性、可用性和还原时间方面有明显的优势。这个特性大大的减少了采用时点恢复所需的工作量以及数据库脱机的时间。
 
@@ -31,7 +32,7 @@ tags:
 
 使用语法上整体保持与Oracle兼容，使用更加方便。元组头不保存事务时间信息，需要开启track_commit_timestamp = on，获取事务提交时间，以支持通过事务号、时间戳进行闪回查询。
 
-#### 基于undo
+## 基于undo
 
 PostgreSQL 中很多机制是跟堆表以及这种多版本实现相关的，为了避免这种多版本实现带来的诸多问题，社区开发了基于回滚段的堆表实现，详细可参考zheap。
 
@@ -47,9 +48,9 @@ zheap 将通过允许就地更新来防止膨胀，zheap只会保存最后一个
 
 以后，可以基于回滚段实现更强大的闪回功能！
 
-#### 实例
+## 实例
 
-##### 延迟从库
+### 延迟从库
 
 默认情况下，备用服务器会尽快从主服务器恢复WAL记录。
 
@@ -102,7 +103,7 @@ postgres=# SELECT * FROM test_recovery_delay ;
   2 | 2019-01-08 13:07:16.291744
 (2 rows)
 
--- stANDby
+-- standby
 postgres=# \d
                    List of relations
  Schema |           Name           |   Type   |  Owner  
@@ -173,7 +174,7 @@ replication_lag_time       | 392
 receiving_streamed_wal     | t
 ```
 
-##### 基于时间点恢复（PITR）
+### 基于时间点恢复（PITR）
 
 ```shell
 # primary
@@ -324,7 +325,7 @@ postgres=# SELECT * FROM test_pitr;
 (4 rows)
 ```
 
-##### 闪回查询
+### 闪回查询
 
 闪回查询
 
@@ -464,7 +465,7 @@ VERSIONS BETWEEN TIMESTAMP
 
 
 
-#### 相关链接
+## 相关链接
 
 https://repmgr.org/
 

@@ -7,7 +7,7 @@ tags:
   - Hash Partition
 ---
 
-
+##  简介
 
 基于pg10实现hash分区，下面介绍参照range/list分区实现的hash分区。
 
@@ -23,7 +23,7 @@ tags:
 
 - select时约束排除使用相同的算法过滤分区。
 
-建表语法
+## 建表语法
 
 ```sql
 yonj1e=# create table h (h_id int, h_name name, h_date date) partition by hash(h_id);
@@ -66,7 +66,7 @@ CREATE TABLE
                     $$ = n;
                 }
 ```
-插入数据
+## 插入数据
 
 insert时，做的修改也是在range/list分区基础上做的修改，增加的代码不多，代码在parition.c文件get_partition_for_tuple()，根据value值计算出目标分区，
 ```c
@@ -130,7 +130,7 @@ postgres=# select tableoid::regclass,* from h;
 
 postgres=# 
 ```
-数据查询
+## 数据查询
 
 这里主要修改查询规划部分，在relation_excluded_by_constraints函数中添加对hash分区的过滤处理，排除掉不需要扫描的分区，这里使用与插入时一样的算法，找到目标分区，排除没必要的分区
 
@@ -203,7 +203,7 @@ postgres=# explain analyze select * from h where id in (1,2,3);
  Execution time: 0.073 ms
 (9 rows)
 ```
-备份恢复
+## 备份恢复
 
 添加hash partition之后，备份恢复时，创建分区时将分区key的信息记录到了pg_class.relpartbound，
 ```sql
@@ -265,7 +265,7 @@ if(!(strcmp(strategy, s) == 0))
 	appendPQExpBufferStr(q, tbinfo->partbound);
 }
 ```
-回归测试
+## 回归测试
 
 /src/test/regress/sql/：相关测试的sql文件
 
@@ -283,7 +283,7 @@ Beta2上是没有hash partition的，所以创建hash partition时会有不同�
 -) PARTITION BY HASH (a);
 -ERROR:  unrecognized partitioning strategy "hash"
 ```
-其他
+## 其他
 
 \d \d+
 ```sql
@@ -310,7 +310,10 @@ Partition constraint: (id IS NOT NULL)
 Partition of: h SERIAL NUMBER 1
 Partition constraint: (id IS NOT NULL)
 ```
-不支持 attach、detach
+## 限制
+
+### 不支持 attach、detach
+
 ```sql
 postgres=# create table h3 (id int);
 CREATE TABLE
@@ -319,13 +322,15 @@ ERROR:  hash partition do not support attach operation
 postgres=# alter table h detach partition h2;
 ERROR:  hash partition do not support detach operation
 ```
-不支持 drop 分区子表
+### 不支持 drop 分区子表
+
 ```sql
 postgres=# drop table h2;
 ERROR:  hash partition "h2" can not be dropped
 ```
 outfunc.c readfunc.c copyfunc.c
 
-邮件列表
+## 邮件列表
 
 https://www.postgresql.org/message-id/2017082612390093777512%40highgo.com
+
