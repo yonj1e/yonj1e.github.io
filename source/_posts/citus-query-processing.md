@@ -1,5 +1,5 @@
 ---
-title: Citus中的分片策略:追加分配
+title: Citus Query Processing
 date: 2019-09-14
 categories: 
   - [Citus]
@@ -29,7 +29,7 @@ coordinator节点收到用户SQL请求后，首先将用户的SQL请求拆分成
 
 架构如下：
 
-![img](citus-query-processing/citus-query-processing.png)
+![1571542642296](citus-query-processing/1571542642296.png)
 
 蓝色为citus插件加的功能，黄色为postgreSQL自带的功能。
 
