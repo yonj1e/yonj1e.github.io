@@ -5,7 +5,7 @@ categories:
   - [PostgreSQL]
 tags: 
   - PITR
- - Flashback
+  - FlashBack Query
 ---
 
 
@@ -30,7 +30,7 @@ tags:
 
 为了降低保留历史版本带来的膨胀等诸多问题，vacuum需要选择性的清理历史数据，以满足闪回及PG本身正常运行的需要。
 
-使用语法上整体保持与Oracle兼容，使用更加方便。元组头不保存事务时间信息，需要开启track_commit_timestamp = on，获取事务提交时间，以支持通过事务号、时间戳进行闪回查询。
+使用语法上整体保持与Oracle兼容，使用更加方便。元组头不保存事务时间信息，需要开启`track_commit_timestamp = on`，获取事务提交时间，以支持通过事务号、时间戳进行闪回查询。
 
 ## 基于undo
 
@@ -70,16 +70,16 @@ recovery_min_apply_delay （integer）
  ID | Name     | Role    | Status    | Upstream | Location | Replication lag | Last replayed LSN
 ----+----------+---------+-----------+----------+----------+-----------------+-------------------
  1  | young-91 | primary | * running |          | default  | n/a             | none             
- 2  | young-90 | stANDby |   running | young-91 | default  | 0 bytes         | 0/20235CF0
+ 2  | young-90 | standby |   running | young-91 | default  | 0 bytes         | 0/20235CF0
  
-# stANDby
+# standby
 [yangjie@young-90 bin] ./repmgr cluster show
  ID | Name     | Role    | Status    | Upstream | Location | Replication lag | Last replayed LSN
 ----+----------+---------+-----------+----------+----------+-----------------+-------------------
  1  | young-91 | primary | * running |          | default  | n/a             | none             
- 2  | young-90 | stANDby |   running | young-91 | default  | 0 bytes         | 0/20235CF0  
+ 2  | young-90 | standby |   running | young-91 | default  | 0 bytes         | 0/20235CF0  
 [yangjie@young-90 bin]$ cat ../data/recovery.conf 
-stANDby_mode = 'on'
+standby_mode = 'on'
 primary_conninfo = 'host=''young-91'' user=repmgr connect_timeout=2 fallback_application_name=repmgr application_name=''young-90'''
 recovery_target_timeline = 'latest'
 recovery_min_apply_delay = 5min
@@ -129,15 +129,15 @@ postgres=# \d
 也可以通过 repmgr node status 查看Last received LSN，Last replayed LSN，Replication lag等信息：
 
 ```shell
-# stANDby
+# standby
 [yangjie@young-90 bin]$ ./repmgr node status
 Node "young-90":
 	postgres Database version: 5.1.0
 	Total data size: 397 MB
 	Conninfo: host=young-90 user=repmgr dbname=repmgr connect_timeout=2
-	Role: stANDby
+	Role: standby
 	WAL archiving: off
-	Archive commAND: (none)
+	Archive command: (none)
 	Replication connections: 0 (of maximal 10)
 	Replication slots: 0 (of maximal 10)
 	Upstream node: young-91 (ID: 1)
@@ -180,7 +180,7 @@ receiving_streamed_wal     | t
 # primary
 # postgresql.conf
 archive_mode = on
-archive_commAND = 'ssh young-90 test ! -f /work/pgsql/pgsql-11-sTABLE/archives/%f && scp %p young-90:/work/pgsql/pgsql-11-sTABLE/archives/%f'
+archive_command = 'ssh young-90 test ! -f /work/pgsql/pgsql-11-stable/archives/%f && scp %p young-90:/work/pgsql/pgsql-11-stable/archives/%f'
 ```
 
 创建表添加几条测试数据。
@@ -257,7 +257,7 @@ postgres=# SELECT pg_switch_wal();
 正常情况下，wal日志段在达到16M后会自动归档，由于测试我们使用手动切换归档。 
 
 ```shell
-# stANDby
+# standby
 ll archives/
 total 98308
 -rw------- 1 yangjie yangjie 16777216 Jan  8 14:21 000000010000000000000001
@@ -272,16 +272,16 @@ total 98308
 修改备库配置文件
 
 ```shell
-# stANDby 
+# standby 
 # recovery.conf
-stANDby_mode = 'off'
+standby_mode = 'off'
 primary_conninfo = 'host=''young-91'' user=repmgr application_name=young90 connect_timeout=2'
 recovery_target_time = '2019-01-08 14:26:00'
-restore_commAND = 'cp /work/pgsql/pgsql-11-sTABLE/archives/%f %p'
+restore_command = 'cp /work/pgsql/pgsql-11-stable/archives/%f %p'
 
 # postgresql.conf
 #archive_mode = on
-#archive_commAND = 'ssh young-90 test ! -f /work/pgsql/pgsql-11-sTABLE/archives/%f && scp %p young-90:/work/pgsql/pgsql-11-sTABLE/archives/%f'
+#archive_command = 'ssh young-90 test ! -f /work/pgsql/pgsql-11-stable/archives/%f && scp %p young-90:/work/pgsql/pgsql-11-stable/archives/%f'
 ```
 
 重启备库
@@ -289,7 +289,7 @@ restore_commAND = 'cp /work/pgsql/pgsql-11-sTABLE/archives/%f %p'
 会进行PITR恢复到指定的时间点
 
 ```shell
-# stANDby
+# standby
 [yangjie@young-90 bin]$ ./pg_ctl -D ../data/ start
 waiting for server to start....
 2019-01-08 14:29:33.364 CST [24910] LOG:  listening on IPv4 address "0.0.0.0", port 5432

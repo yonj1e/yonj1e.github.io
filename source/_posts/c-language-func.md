@@ -1,10 +1,10 @@
 ---
 title: PGSQL中的C语言函数
-date: 2019-08-20
+date: 2018-08-20
 categories: 
   - [PostgreSQL]
 tags: 
-  - c-Language Functions
+  - C-Language Functions
 ---
 
 [官方文档](https://www.postgresql.org/docs/current/static/xfunc-c.html)

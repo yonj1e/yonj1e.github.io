@@ -5,6 +5,8 @@ categories:
   - [PostgreSQL]
 tags: 
   - Order By
+  - WITH Queries
+  - Multicolumn Indexes
 ---
 
 ## 简介
@@ -125,21 +127,15 @@ test=# explain analyze select data_id from test_tbl where status=0 and city_id=3
 
 实际上PG会通过计算成本得到应该使用哪个索引
 
-
-
 在limit10 时, 使用test_tbl_city_id_sub_type_create_time_idx索引的时候，需要扫描1199行，然后排序，总cost是 cost=4268.71..4271.57，然后取出 desc 的10个tuple,需要的cost是cost=4268.71..4268.73,
 
 实际的执行时间是: actual time=0.082..0.084，从这点来看，limit 10 的真正执行时间比执行计划还快, 可以认为是查询规化器从诸多查询路径中，找到较优的执行计划了.
-
-
 
 在 limit 1 时, 使用 test_tbl_create_time_idx的时候, 
 
 Limit (cost=0.44..1690.33 rows=1 width=16) (actual time=12816.268..12816.269 rows=1 loops=1)
 
 执行计划预估是 cost=0.44..1690.33，但是实际却是 actual time=12816.268..12816.269,  明显查询规化器从诸多查询路径中，找到的执行计划不是较优的. 也就是查询规化器出现了误判.
-
-
 
 返回多少条记录能达到4271.57成本（limit 1 cost 1690.33，limit 10 sort cost 4271.57）
 
