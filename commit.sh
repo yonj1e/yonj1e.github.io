@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -o errexit
-
 hexo clean
 
 # 打印操作
