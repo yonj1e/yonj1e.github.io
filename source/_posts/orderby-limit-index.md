@@ -1,5 +1,5 @@
 ---
-title: PostgreSQ 中 order by limit 索引选择问题
+title: PostgreSQ中order by limit索引选择问题
 date: 2019-06-27 
 categories: 
   - [PostgreSQL]

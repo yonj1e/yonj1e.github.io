@@ -1,5 +1,5 @@
 ---
-title: PGSQL中的C语言函数
+title: PostgreSQL中的C语言函数
 date: 2018-08-20
 categories: 
   - [PostgreSQL]
