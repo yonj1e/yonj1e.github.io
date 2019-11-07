@@ -10,7 +10,12 @@ tags:
 
 
 
+
 [Append Distribution]:https://docs.citusdata.com/en/latest/develop/append.html
+
+[Replication Model]:https://www.citusdata.com/blog/2016/12/15/citus-replication-model-today-and-tomorrow/
+
+
 
 > 本文内容来自citus官方文档，包括一些原文翻译，简略介绍，使用示例等内容。
 
@@ -554,7 +559,53 @@ ERROR:  INSERT ... SELECT into an append-distributed table is not supported
 ERROR:  modifying the partition value of rows is not allowed
 
 ```sql
+# Across the shard
 young=# update range set col1 = 11 where id = 5;
 ERROR:  modifying the partition value of rows is not allowed
+
+# The same shard
+young=# update range set col1 = 11 where id = 12;
+ERROR:  modifying the partition value of rows is not allowed
 ```
+
+## replication model
+
+以append方式建表时可以注意到
+
+```sql
+NOTICE:  using statement-based replication
+DETAIL:  Streaming replication is supported only for hash-distributed tables.
+```
+
+citus 有两种复制模式：基于语句复制、流复制
+
+最初版本的citus主要用来做实时分析，数据也是通过追加方式存储在分布式集群中。
+
+事件数据的这些属性使事件数据的并行加载变得相对容易，而不需要牺牲一致性语义。协调节点将保存与集群中的碎片和碎片放置(副本)相关的元数据。然后，客户机将与协调器节点通信，并交换元数据，以便在这些元数据上附加事件数据碎片。一旦客户端将相关事件数据附加到相关碎片中，客户端将通过更新协调节点上的碎片元数据来结束操作。
+
+ ![Citus cluster ingesting append-only events data from files](citus-append-distribution/citus-batch-append-event-527c025d.jpg) 
+
+上面的简化图显示了一个数据加载示例。客户端告诉协调器节点，它希望将事件数据追加到追加分布式表中。协调节点向客户提供有关shard 6的位置信息。然后客户端将这些事件复制到碎片的位置，并使用相关元数据更新协调器。如果客户机无法将事件复制到其中一个节点，它可以将相关碎片的位置标记为无效，也可以中止复制操作。
+
+追加分配还存在一个问题是不能更新数据，上面已经做过测试。
+
+因此，我们将Citus的基于语句的复制模型进行了扩展。 在该模型中，我们还提供了哈希分布作为一种数据分布方法。通过这种方式，用户可以轻松地更新和删除单独的行。启用更新和删除还需要解决两个问题:更新同一行的并发客户机，以及在更新期间一个shard副本不可用。 
+
+因此，我们以两种方式扩展了协调节点。首先，协调器处理涉及相同碎片的update和delete语句的锁定。其次，如果协调节点在写操作期间无法到达碎片副本，则会将该副本标记为不健康。然后，用户将运行一个命令来修复不健康的副本。
+
+从一致性语义的角度来看，这种方法通常称为读写一致性（写后读一致性）。
+
+ ![Citus cluster receiving inserts and updates for user data and one shard placement becomes unavailable](citus-append-distribution/citus-insert-update-user-66fbd116.jpg) 
+
+假设您有200个表，如果并发更新了10个表的碎片，但是无法到达保存碎片副本的机器您需要将该机器上的所有200个碎片副本标记为非活动的。
+
+如果高可用性特性，那么基于语句的复制通常是不够好的。
+
+解决方法之一是将 replication factor 设置为1，不使用副本。
+
+另一种方案是从基于语句复制切换到流复制。
+
+这种方法的架构如下：
+
+ ![Citus serving multi-tenant applications using streaming replication](citus-append-distribution/citus-streaming-replica-setup-04917fc2.jpg) 
 
