@@ -542,6 +542,84 @@ young=# table test ;
 
 ### other
 
+ERROR:  cannot run INSERT command which targets multiple shards
+
+```sql
+cat test.csv 
+1,1
+2,2
+3,3
+4,4
+5,5
+
+young=# copy test from '/data/citus/test.csv' with csv;
+COPY 5
+young=# table pg_dist_shard;
+ logicalrelid  | shardid | shardstorage |    shardminvalue    |    shardmaxvalue    
+---------------+---------+--------------+---------------------+---------------------
+ test          |  102096 | t            | 1                   | 5
+(1 rows)
+
+cat test.csv 
+7,7
+8,8
+young=# copy test from '/data/citus/test.csv' with csv;
+COPY 2
+young=# table pg_dist_shard;
+ logicalrelid  | shardid | shardstorage |    shardminvalue    |    shardmaxvalue    
+---------------+---------+--------------+---------------------+---------------------
+ test          |  102096 | t            | 1                   | 5
+ test          |  102097 | t            | 7                   | 8
+(2 rows)
+
+cat test.csv 
+8,8
+9,9
+young=# copy test from '/data/citus/test.csv' with csv;
+COPY 2
+young=# table pg_dist_shard;
+ logicalrelid  | shardid | shardstorage |    shardminvalue    |    shardmaxvalue    
+---------------+---------+--------------+---------------------+---------------------
+ test          |  102096 | t            | 1                   | 5
+ test          |  102097 | t            | 7                   | 8
+ test          |  102098 | t            | 8                   | 9
+(3 rows)
+```
+
+shard_102097和shard_102098分区边界重合
+
+```sql
+young=# SELECT
+    n.nodename,
+    n.nodeport,
+    sum(foo.result::int4)
+FROM (
+    SELECT *
+    FROM
+        run_command_on_shards ('test',
+            'select count(*) from %s')) AS foo,
+    pg_dist_placement p,
+    pg_dist_node n
+WHERE
+    foo.shardid = p.shardid
+    AND p.groupid = n.groupid
+GROUP BY
+    n.nodename,
+    n.nodeport;
+ nodename  | nodeport | sum 
+-----------+----------+-----
+ 10.0.0.20 |     9432 |   2
+ 10.0.0.5  |     9432 |   2
+ 10.0.0.21 |     9432 |   5
+(3 rows)
+
+young=# insert into test values (8,8);
+ERROR:  cannot run INSERT command which targets multiple shards
+HINT:  Make sure the value for partition column "col" falls into a single shard.
+```
+
+
+
 ERROR:  INSERT ... SELECT into an append-distributed table is not supported
 
 ```sql
