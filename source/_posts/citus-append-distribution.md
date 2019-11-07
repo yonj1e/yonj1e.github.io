@@ -6,6 +6,8 @@ categories:
 tags: 
   - Sharding
   - Append Distribution
+  - statement-based replication
+  - streaming replication
 ---
 
 
