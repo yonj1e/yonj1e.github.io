@@ -12,10 +12,9 @@ tags:
 
 
 
+https://docs.citusdata.com/en/latest/develop/append.html
 
-[Append Distribution]:https://docs.citusdata.com/en/latest/develop/append.html
-
-[Replication Model]:https://www.citusdata.com/blog/2016/12/15/citus-replication-model-today-and-tomorrow/
+https://www.citusdata.com/blog/2016/12/15/citus-replication-model-today-and-tomorrow/
 
 
 
@@ -137,7 +136,7 @@ The [\copy](http://www.postgresql.org/docs/current/static/app-psql.html#APP-PSQL
 
 You can use \copy both on the coordinator and from any of the  workers. When using it from the worker, you need to add the master_host  option. Behind the scenes, \copy first opens a connection to the  coordinator using the provided master_host option and uses  master_create_empty_shard to create a new shard. Then, the command  connects to the workers and copies data into the replicas until the size reaches shard_max_size, at which point another new shard is created.  Finally, the command fetches statistics for the shards and updates the  metadata.
 
-您可以在协调程序和任何工作程序上使用\copy。当从工作者中使用它时，您需要添加master_host选项。在后台，\copy首先使用提供的master_host选项打开到协调器的连接，并使用master_create_empty_shard创建一个新的shard。然后，该命令连接到工作者并将数据复制到副本中，直到大小达到shard_max_size，此时将创建另一个新分片。最后，该命令获取分片的统计信息并更新元数据。
+您可以在协调节点和任何工作节点上使用\copy。当从工作节点中使用它时，您需要添加master_host选项。在后台，\copy首先使用提供的master_host选项打开到协调节点的连接，并使用master_create_empty_shard创建一个新的shard。然后，该命令连接到工作节点并将数据复制到副本中，直到大小达到shard_max_size，此时将创建另一个新分片。最后，该命令获取分片的统计信息并更新元数据。
 
 ```sql
 SET citus.shard_max_size TO '64MB';
@@ -583,23 +582,23 @@ citus 有两种复制模式：基于语句复制、流复制
 
 最初版本的citus主要用来做实时分析，数据也是通过追加方式存储在分布式集群中。
 
-事件数据的这些属性使事件数据的并行加载变得相对容易，而不需要牺牲一致性语义。协调节点将保存与集群中的碎片和碎片放置(副本)相关的元数据。然后，客户机将与协调器节点通信，并交换元数据，以便在这些元数据上附加事件数据碎片。一旦客户端将相关事件数据附加到相关碎片中，客户端将通过更新协调节点上的碎片元数据来结束操作。
+事件数据的这些属性使事件数据的并行加载变得相对容易，而不需要牺牲一致性语义。协调节点将保存与集群中的分片和分片放置(副本)相关的元数据。然后，客户机将与协调节点节点通信，并交换元数据，以便在这些元数据上附加事件数据分片。一旦客户端将相关事件数据附加到相关分片中，客户端将通过更新协调节点上的分片元数据来结束操作。
 
  ![Citus cluster ingesting append-only events data from files](citus-append-distribution/citus-batch-append-event-527c025d.jpg) 
 
-上面的简化图显示了一个数据加载示例。客户端告诉协调器节点，它希望将事件数据追加到追加分布式表中。协调节点向客户提供有关shard 6的位置信息。然后客户端将这些事件复制到碎片的位置，并使用相关元数据更新协调器。如果客户机无法将事件复制到其中一个节点，它可以将相关碎片的位置标记为无效，也可以中止复制操作。
+上面的简化图显示了一个数据加载示例。客户端告诉协调节点节点，它希望将事件数据追加到追加分布式表中。协调节点向客户提供有关shard 6的位置信息。然后客户端将这些事件复制到分片的位置，并使用相关元数据更新协调节点。如果客户机无法将事件复制到其中一个节点，它可以将相关分片的位置标记为无效，也可以中止复制操作。
 
 追加分配还存在一个问题是不能更新数据，上面已经做过测试。
 
 因此，我们将Citus的基于语句的复制模型进行了扩展。 在该模型中，我们还提供了哈希分布作为一种数据分布方法。通过这种方式，用户可以轻松地更新和删除单独的行。启用更新和删除还需要解决两个问题:更新同一行的并发客户机，以及在更新期间一个shard副本不可用。 
 
-因此，我们以两种方式扩展了协调节点。首先，协调器处理涉及相同碎片的update和delete语句的锁定。其次，如果协调节点在写操作期间无法到达碎片副本，则会将该副本标记为不健康。然后，用户将运行一个命令来修复不健康的副本。
+因此，我们以两种方式扩展了协调节点。首先，协调节点处理涉及相同分片的update和delete语句的锁定。其次，如果协调节点在写操作期间无法到达分片副本，则会将该副本标记为不健康。然后，用户将运行一个命令来修复不健康的副本。
 
 从一致性语义的角度来看，这种方法通常称为读写一致性（写后读一致性）。
 
  ![Citus cluster receiving inserts and updates for user data and one shard placement becomes unavailable](citus-append-distribution/citus-insert-update-user-66fbd116.jpg) 
 
-假设您有200个表，如果并发更新了10个表的碎片，但是无法到达保存碎片副本的机器您需要将该机器上的所有200个碎片副本标记为非活动的。
+假设您有200个表，如果并发更新了10个表的分片，但是无法到达保存分片副本的机器您需要将该机器上的所有200个分片副本标记为非活动的。
 
 如果高可用性特性，那么基于语句的复制通常是不够好的。
 
