@@ -635,18 +635,6 @@ young=# insert into range select id, id from generate_series(1,15) as id;
 ERROR:  INSERT ... SELECT into an append-distributed table is not supported
 ```
 
-ERROR:  modifying the partition value of rows is not allowed
-
-```sql
-# Across the shard
-young=# update range set col1 = 11 where id = 5;
-ERROR:  modifying the partition value of rows is not allowed
-
-# The same shard
-young=# update range set col1 = 11 where id = 12;
-ERROR:  modifying the partition value of rows is not allowed
-```
-
 ## replication model
 
 以append方式建表时可以注意到
