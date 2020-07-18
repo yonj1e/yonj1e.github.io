@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.0.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=7.4.2">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=7.4.2">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=7.4.2">
+  <link rel="mask-icon" href="/images/logo.svg?v=7.4.2" color="#222">
+
+<link rel="stylesheet" href="/css/main.css?v=7.4.2">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css?v=4.7.0">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Pisces',
+    version: '7.4.2',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":true,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    translation: {
+      copy_button: '复制',
+      copy_success: '复制成功',
+      copy_failure: '复制失败'
+    },
+    sidebarPadding: 40
+  };
+</script>
+
+  <meta name="description" content="在使用数据库的过程中，不管是业务开发者还是运维人员，都有可能对数据库进行误操作，比如全表不带条件的update或delete等。 恢复措施误操作之后又有哪些补救措施呢？  延迟从库：发现误操作后，尽快利用从库还原主库。 基于时间点恢复（PITR）：使用由连续归档功能创建的基础备份和归档日志将数据库群恢复到任何时间点的功能。 闪回方案：是成本最低的一种方式，能够有效的、快速地处理一些数据库误操作等。">
+<meta name="keywords" content="PITR,FlashBack Query">
+<meta property="og:type" content="article">
+<meta property="og:title" content="浅谈数据库误操作恢复">
+<meta property="og:url" content="http:&#x2F;&#x2F;blog.yonj1e.top&#x2F;2018&#x2F;12&#x2F;29&#x2F;misoperation-recovery&#x2F;index.html">
+<meta property="og:site_name" content="Yonj1e&#39;s Blog">
+<meta property="og:description" content="在使用数据库的过程中，不管是业务开发者还是运维人员，都有可能对数据库进行误操作，比如全表不带条件的update或delete等。 恢复措施误操作之后又有哪些补救措施呢？  延迟从库：发现误操作后，尽快利用从库还原主库。 基于时间点恢复（PITR）：使用由连续归档功能创建的基础备份和归档日志将数据库群恢复到任何时间点的功能。 闪回方案：是成本最低的一种方式，能够有效的、快速地处理一些数据库误操作等。">
+<meta property="og:locale" content="zh-CN">
+<meta property="og:updated_time" content="2020-07-18T14:11:26.132Z">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://blog.yonj1e.top/2018/12/29/misoperation-recovery/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true,
+    isPage: false,
+    isArchive: false
+  };
+</script>
+
+  <title>浅谈数据库误操作恢复 | Yonj1e's Blog</title>
+  
+
+
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Yonj1e's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+        <p class="site-subtitle">PostgreSQL Developer & DBA, @ksyun.com</p>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <a role="button" class="book-mark-link book-mark-link-fixed"></a>
+
+  <a href="https://github.com/yonj1e" class="github-corner" title="Follow me on GitHub" aria-label="Follow me on GitHub" rel="noopener" target="_blank"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://blog.yonj1e.top/2018/12/29/misoperation-recovery/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/head.jpg">
+      <meta itemprop="name" content="Yang Jie">
+      <meta itemprop="description" content="Stay hungry, Stay young">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Yonj1e's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          浅谈数据库误操作恢复
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-12-29 00:00:00" itemprop="dateCreated datePublished" datetime="2018-12-29T00:00:00+00:00">2018-12-29</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-07-18 14:11:26" itemprop="dateModified" datetime="2020-07-18T14:11:26+00:00">2020-07-18</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/PostgreSQL/" itemprop="url" rel="index">
+                    <span itemprop="name">PostgreSQL</span>
+                  </a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>在使用数据库的过程中，不管是业务开发者还是运维人员，都有可能对数据库进行误操作，比如全表不带条件的update或delete等。</p>
+<h2 id="恢复措施"><a href="#恢复措施" class="headerlink" title="恢复措施"></a>恢复措施</h2><p>误操作之后又有哪些补救措施呢？</p>
+<ul>
+<li>延迟从库：发现误操作后，尽快利用从库还原主库。</li>
+<li>基于时间点恢复（PITR）：使用由连续归档功能创建的基础备份和归档日志将数据库群恢复到任何时间点的功能。</li>
+<li>闪回方案：是成本最低的一种方式，能够有效的、快速地处理一些数据库误操作等。</li>
+</ul>
+<h2 id="闪回方案"><a href="#闪回方案" class="headerlink" title="闪回方案"></a>闪回方案</h2><p>闪回技术与介质恢复相比，在易用性、可用性和还原时间方面有明显的优势。这个特性大大的减少了采用时点恢复所需的工作量以及数据库脱机的时间。</p>
+<p>闪回查询是指针对特定的表来查询特定的时间段内的数据变化情况来确定是否将表闪回到某一个特定的时刻以保证数据无误存在。</p>
+<p>实现原理是根据PostgreSQL多版本并发控制机制、元组可见性检查规则实现，多版本保留死亡元祖，保证误操作之前的版本存在，用于闪回查询，其次，修改可见性检查规则，使事务在执行时，查询误操作之前的版本，通过闪回查询历史版本还原数据库在错误发生点之前。</p>
+<p>为了降低保留历史版本带来的膨胀等诸多问题，vacuum需要选择性的清理历史数据，以满足闪回及PG本身正常运行的需要。</p>
+<p>使用语法上整体保持与Oracle兼容，使用更加方便。元组头不保存事务时间信息，需要开启<code>track_commit_timestamp = on</code>，获取事务提交时间，以支持通过事务号、时间戳进行闪回查询。</p>
+<h2 id="基于undo"><a href="#基于undo" class="headerlink" title="基于undo"></a>基于undo</h2><p>PostgreSQL 中很多机制是跟堆表以及这种多版本实现相关的，为了避免这种多版本实现带来的诸多问题，社区开发了基于回滚段的堆表实现，详细可参考zheap。</p>
+<p>zheap一种新的存储方式，三个主要目标：</p>
+<ol>
+<li>对膨胀提供更好的控制</li>
+<li>避免重写堆页，可以减少写放大</li>
+<li>通过缩小元组头和消除大多数对齐填充来减少元组大小</li>
+</ol>
+<p>zheap 将通过允许就地更新来防止膨胀，zheap只会保存最后一个版本的数据在数据文件中，tupler header没有了，所有事务信息都存储在 undo 中，因此元组不需要存储此类信息的字段。</p>
+<p>每个 undo 记录头包含正在执行操作的事务的先前 undo 记录指针的位置，因此，特定事务中的 undo 记录形成单个链接链，可以遍历undo chain来查找历史版本。</p>
+<p>以后，可以基于回滚段实现更强大的闪回功能！</p>
+<h2 id="实例"><a href="#实例" class="headerlink" title="实例"></a>实例</h2><h3 id="延迟从库"><a href="#延迟从库" class="headerlink" title="延迟从库"></a>延迟从库</h3><p>默认情况下，备用服务器会尽快从主服务器恢复WAL记录。</p>
+<p>拥有时间延迟的数据副本可能很有用，可以提供纠正数据丢失错误的机会。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> 是应用延迟，不是传输延迟</span></span><br><span class="line"><span class="meta">#</span><span class="bash"> 主库还是会等从库落盘才会提交</span></span><br><span class="line">recovery_min_apply_delay （integer）</span><br></pre></td></tr></table></figure>
+
+<p>使用repmgr搭建的流复制集群，修改备节点recovery.conf，设置recovery_min_apply_delay = 5min</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> primary</span></span><br><span class="line">[yangjie@young-91 bin]$ ./repmgr cluster show</span><br><span class="line"> ID | Name     | Role    | Status    | Upstream | Location | Replication lag | Last replayed LSN</span><br><span class="line">----+----------+---------+-----------+----------+----------+-----------------+-------------------</span><br><span class="line"> 1  | young-91 | primary | * running |          | default  | n/a             | none             </span><br><span class="line"> 2  | young-90 | standby |   running | young-91 | default  | 0 bytes         | 0/20235CF0</span><br><span class="line"> </span><br><span class="line"><span class="meta">#</span><span class="bash"> standby</span></span><br><span class="line">[yangjie@young-90 bin] ./repmgr cluster show</span><br><span class="line"> ID | Name     | Role    | Status    | Upstream | Location | Replication lag | Last replayed LSN</span><br><span class="line">----+----------+---------+-----------+----------+----------+-----------------+-------------------</span><br><span class="line"> 1  | young-91 | primary | * running |          | default  | n/a             | none             </span><br><span class="line"> 2  | young-90 | standby |   running | young-91 | default  | 0 bytes         | 0/20235CF0  </span><br><span class="line">[yangjie@young-90 bin]$ cat ../data/recovery.conf </span><br><span class="line">standby_mode = 'on'</span><br><span class="line">primary_conninfo = 'host=''young-91'' user=repmgr connect_timeout=2 fallback_application_name=repmgr application_name=''young-90'''</span><br><span class="line">recovery_target_timeline = 'latest'</span><br><span class="line">recovery_min_apply_delay = 5min</span><br></pre></td></tr></table></figure>
+
+<p>在主节点创建表并插入几条数据，检查复制延迟</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- primary</span></span><br><span class="line"><span class="comment">-- 主节点创建表并插入几条测试数据</span></span><br><span class="line">postgres=<span class="comment"># CREATE TABLE test_recovery_delay(id int, ts timestamp);</span></span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span></span><br><span class="line">postgres=<span class="comment"># INSERT INTO test_recovery_delay VALUES (1,now());</span></span><br><span class="line"><span class="keyword">INSERT</span> <span class="number">0</span> <span class="number">1</span></span><br><span class="line">postgres=<span class="comment"># INSERT INTO test_recovery_delay VALUES (2,now());</span></span><br><span class="line"><span class="keyword">INSERT</span> <span class="number">0</span> <span class="number">1</span></span><br><span class="line">postgres=<span class="comment"># SELECT * FROM test_recovery_delay ;</span></span><br><span class="line"> <span class="keyword">id</span> |             ts             </span><br><span class="line"><span class="comment">----+----------------------------</span></span><br><span class="line">  <span class="number">1</span> | <span class="number">2019</span><span class="number">-01</span><span class="number">-08</span> <span class="number">13</span>:<span class="number">07</span>:<span class="number">12.699596</span></span><br><span class="line">  <span class="number">2</span> | <span class="number">2019</span><span class="number">-01</span><span class="number">-08</span> <span class="number">13</span>:<span class="number">07</span>:<span class="number">16.291744</span></span><br><span class="line">(<span class="number">2</span> <span class="keyword">rows</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment">-- standby</span></span><br><span class="line">postgres=<span class="comment"># \d</span></span><br><span class="line">                   <span class="keyword">List</span> <span class="keyword">of</span> relations</span><br><span class="line"> <span class="keyword">Schema</span> |           <span class="keyword">Name</span>           |   <span class="keyword">Type</span>   |  Owner  </span><br><span class="line"><span class="comment">--------+--------------------------+----------+---------</span></span><br><span class="line"> <span class="keyword">public</span> | t_test                   | <span class="keyword">TABLE</span>    | yangjie</span><br><span class="line"> <span class="keyword">public</span> | t_test_id_seq            | <span class="keyword">sequence</span> | yangjie</span><br><span class="line"> <span class="keyword">public</span> | <span class="keyword">test</span>                     | <span class="keyword">TABLE</span>    | yangjie</span><br><span class="line">(<span class="number">3</span> <span class="keyword">rows</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 等五分钟</span></span><br><span class="line"></span><br><span class="line">postgres=<span class="comment"># \d</span></span><br><span class="line">                   <span class="keyword">List</span> <span class="keyword">of</span> relations</span><br><span class="line"> <span class="keyword">Schema</span> |           <span class="keyword">Name</span>           |   <span class="keyword">Type</span>   |  Owner  </span><br><span class="line"><span class="comment">--------+--------------------------+----------+---------</span></span><br><span class="line"> <span class="keyword">public</span> | t_test                   | <span class="keyword">TABLE</span>    | yangjie</span><br><span class="line"> <span class="keyword">public</span> | t_test_id_seq            | <span class="keyword">sequence</span> | yangjie</span><br><span class="line"> <span class="keyword">public</span> | <span class="keyword">test</span>                     | <span class="keyword">TABLE</span>    | yangjie</span><br><span class="line"> <span class="keyword">public</span> | test_recovery_delay      | <span class="keyword">TABLE</span>    | yangjie</span><br><span class="line">(<span class="number">4</span> <span class="keyword">rows</span>)</span><br></pre></td></tr></table></figure>
+
+<p>也可以通过 repmgr node status 查看Last received LSN，Last replayed LSN，Replication lag等信息：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> standby</span></span><br><span class="line">[yangjie@young-90 bin]$ ./repmgr node status</span><br><span class="line">Node "young-90":</span><br><span class="line">	postgres Database version: 5.1.0</span><br><span class="line">	Total data size: 397 MB</span><br><span class="line">	Conninfo: host=young-90 user=repmgr dbname=repmgr connect_timeout=2</span><br><span class="line">	Role: standby</span><br><span class="line">	WAL archiving: off</span><br><span class="line">	Archive command: (none)</span><br><span class="line">	Replication connections: 0 (of maximal 10)</span><br><span class="line">	Replication slots: 0 (of maximal 10)</span><br><span class="line">	Upstream node: young-91 (ID: 1)</span><br><span class="line">	Replication lag: 395 seconds</span><br><span class="line">	Last received LSN: 0/202A8ED8</span><br><span class="line">	Last replayed LSN: 0/20295440</span><br></pre></td></tr></table></figure>
+
+<p>或者SQL：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> ts, </span><br><span class="line">		last_wal_receive_lsn, </span><br><span class="line">		last_wal_replay_lsn, </span><br><span class="line">		last_xact_replay_timestamp, </span><br><span class="line">	<span class="keyword">CASE</span> <span class="keyword">WHEN</span> (last_wal_receive_lsn = last_wal_replay_lsn) </span><br><span class="line">		<span class="keyword">THEN</span> <span class="number">0</span>::<span class="built_in">INT</span> </span><br><span class="line">	<span class="keyword">ELSE</span> </span><br><span class="line">		<span class="keyword">EXTRACT</span>(epoch <span class="keyword">FROM</span> (pg_catalog.clock_timestamp() - last_xact_replay_timestamp))::<span class="built_in">INT</span> </span><br><span class="line">	<span class="keyword">END</span> <span class="keyword">AS</span> replication_lag_time, </span><br><span class="line">	<span class="keyword">COALESCE</span>(last_wal_receive_lsn, <span class="string">'0/0'</span>) &gt;= last_wal_replay_lsn <span class="keyword">AS</span> receiving_streamed_wal </span><br><span class="line"><span class="keyword">FROM</span> ( </span><br><span class="line">	<span class="keyword">SELECT</span> <span class="keyword">CURRENT_TIMESTAMP</span> <span class="keyword">AS</span> ts, </span><br><span class="line">		pg_catalog.pg_last_wal_receive_lsn()       <span class="keyword">AS</span> last_wal_receive_lsn, </span><br><span class="line">		pg_catalog.pg_last_wal_replay_lsn()        <span class="keyword">AS</span> last_wal_replay_lsn, </span><br><span class="line">		pg_catalog.pg_last_xact_replay_timestamp() <span class="keyword">AS</span> last_xact_replay_timestamp </span><br><span class="line">) q ;</span><br><span class="line">-[ RECORD 1 ]<span class="comment">--------------+------------------------------</span></span><br><span class="line">ts                         | 2019-01-08 13:18:19.961552+08</span><br><span class="line">last_wal_receive_lsn       | 0/202ADAC0</span><br><span class="line">last_wal_replay_lsn        | 0/202AB940</span><br><span class="line">last_xact_replay_timestamp | 2019-01-08 13:11:47.534904+08</span><br><span class="line">replication_lag_time       | 392</span><br><span class="line">receiving_streamed_wal     | t</span><br></pre></td></tr></table></figure>
+
+<h3 id="基于时间点恢复（PITR）"><a href="#基于时间点恢复（PITR）" class="headerlink" title="基于时间点恢复（PITR）"></a>基于时间点恢复（PITR）</h3><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> primary</span></span><br><span class="line"><span class="meta">#</span><span class="bash"> postgresql.conf</span></span><br><span class="line">archive_mode = on</span><br><span class="line">archive_command = 'ssh young-90 test ! -f /work/pgsql/pgsql-11-stable/archives/%f &amp;&amp; scp %p young-90:/work/pgsql/pgsql-11-stable/archives/%f'</span><br></pre></td></tr></table></figure>
+
+<p>创建表添加几条测试数据。</p>
+<p>正常情况下，wal日志段在达到16M后会自动归档，由于测试我们使用手动切换归档。 </p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- primary</span></span><br><span class="line">postgres=<span class="comment"># CREATE TABLE test_pitr(id int, ts timestamp);</span></span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span></span><br><span class="line">postgres=<span class="comment"># SELECT pg_switch_wal();</span></span><br><span class="line"> pg_switch_wal </span><br><span class="line"><span class="comment">---------------</span></span><br><span class="line"> <span class="number">0</span>/<span class="number">3017568</span></span><br><span class="line">(<span class="number">1</span> <span class="keyword">row</span>)</span><br><span class="line"></span><br><span class="line">postgres=<span class="comment"># INSERT INTO test_pitr VALUES (1, now());</span></span><br><span class="line"><span class="keyword">INSERT</span> <span class="number">0</span> <span class="number">1</span></span><br><span class="line">postgres=<span class="comment"># INSERT INTO test_pitr VALUES (2, now());</span></span><br><span class="line"><span class="keyword">INSERT</span> <span class="number">0</span> <span class="number">1</span></span><br><span class="line">postgres=<span class="comment"># SELECT * FROM test_pitr ;</span></span><br><span class="line"> <span class="keyword">id</span> |             ts             </span><br><span class="line"><span class="comment">----+----------------------------</span></span><br><span class="line">  <span class="number">1</span> | <span class="number">2019</span><span class="number">-01</span><span class="number">-08</span> <span class="number">14</span>:<span class="number">22</span>:<span class="number">57.734731</span></span><br><span class="line">  <span class="number">2</span> | <span class="number">2019</span><span class="number">-01</span><span class="number">-08</span> <span class="number">14</span>:<span class="number">23</span>:<span class="number">00.598715</span></span><br><span class="line">(<span class="number">2</span> <span class="keyword">rows</span>)</span><br><span class="line"></span><br><span class="line">postgres=<span class="comment"># SELECT pg_switch_wal();</span></span><br><span class="line"> pg_switch_wal </span><br><span class="line"><span class="comment">---------------</span></span><br><span class="line"> <span class="number">0</span>/<span class="number">4000190</span></span><br><span class="line">(<span class="number">1</span> <span class="keyword">row</span>)</span><br><span class="line"></span><br><span class="line">postgres=<span class="comment"># INSERT INTO test_pitr VALUES (3, now());</span></span><br><span class="line"><span class="keyword">INSERT</span> <span class="number">0</span> <span class="number">1</span></span><br><span class="line">postgres=<span class="comment"># INSERT INTO test_pitr VALUES (4, now());</span></span><br><span class="line"><span class="keyword">INSERT</span> <span class="number">0</span> <span class="number">1</span></span><br><span class="line">postgres=<span class="comment"># SELECT * FROM test_pitr ;</span></span><br><span class="line"> <span class="keyword">id</span> |             ts             </span><br><span class="line"><span class="comment">----+----------------------------</span></span><br><span class="line">  <span class="number">1</span> | <span class="number">2019</span><span class="number">-01</span><span class="number">-08</span> <span class="number">14</span>:<span class="number">22</span>:<span class="number">57.734731</span></span><br><span class="line">  <span class="number">2</span> | <span class="number">2019</span><span class="number">-01</span><span class="number">-08</span> <span class="number">14</span>:<span class="number">23</span>:<span class="number">00.598715</span></span><br><span class="line">  <span class="number">3</span> | <span class="number">2019</span><span class="number">-01</span><span class="number">-08</span> <span class="number">14</span>:<span class="number">23</span>:<span class="number">29.175027</span></span><br><span class="line">  <span class="number">4</span> | <span class="number">2019</span><span class="number">-01</span><span class="number">-08</span> <span class="number">14</span>:<span class="number">23</span>:<span class="number">32.25439</span></span><br><span class="line">(<span class="number">4</span> <span class="keyword">rows</span>)</span><br><span class="line">postgres=<span class="comment"># SELECT pg_switch_wal();</span></span><br><span class="line"> pg_switch_wal </span><br><span class="line"><span class="comment">---------------</span></span><br><span class="line"> <span class="number">0</span>/<span class="number">5000190</span></span><br><span class="line">(<span class="number">1</span> <span class="keyword">row</span>)</span><br><span class="line"></span><br><span class="line">postgres=<span class="comment"># INSERT INTO test_pitr VALUES (5, now());</span></span><br><span class="line"><span class="keyword">INSERT</span> <span class="number">0</span> <span class="number">1</span></span><br><span class="line">postgres=<span class="comment"># INSERT INTO test_pitr VALUES (6, now());</span></span><br><span class="line"><span class="keyword">INSERT</span> <span class="number">0</span> <span class="number">1</span></span><br><span class="line">postgres=<span class="comment"># SELECT * FROM test_pitr ;</span></span><br><span class="line"> <span class="keyword">id</span> |             ts             </span><br><span class="line"><span class="comment">----+----------------------------</span></span><br><span class="line">  <span class="number">1</span> | <span class="number">2019</span><span class="number">-01</span><span class="number">-08</span> <span class="number">14</span>:<span class="number">22</span>:<span class="number">57.734731</span></span><br><span class="line">  <span class="number">2</span> | <span class="number">2019</span><span class="number">-01</span><span class="number">-08</span> <span class="number">14</span>:<span class="number">23</span>:<span class="number">00.598715</span></span><br><span class="line">  <span class="number">3</span> | <span class="number">2019</span><span class="number">-01</span><span class="number">-08</span> <span class="number">14</span>:<span class="number">23</span>:<span class="number">29.175027</span></span><br><span class="line">  <span class="number">4</span> | <span class="number">2019</span><span class="number">-01</span><span class="number">-08</span> <span class="number">14</span>:<span class="number">23</span>:<span class="number">32.25439</span></span><br><span class="line">  <span class="number">5</span> | <span class="number">2019</span><span class="number">-01</span><span class="number">-08</span> <span class="number">14</span>:<span class="number">26</span>:<span class="number">57.560111</span></span><br><span class="line">  <span class="number">6</span> | <span class="number">2019</span><span class="number">-01</span><span class="number">-08</span> <span class="number">14</span>:<span class="number">27</span>:<span class="number">01.015577</span></span><br><span class="line">(<span class="number">6</span> <span class="keyword">rows</span>)</span><br><span class="line"></span><br><span class="line">postgres=<span class="comment"># SELECT pg_switch_wal();</span></span><br><span class="line"> pg_switch_wal </span><br><span class="line"><span class="comment">---------------</span></span><br><span class="line"> <span class="number">0</span>/<span class="number">6000358</span></span><br><span class="line">(<span class="number">1</span> <span class="keyword">row</span>)</span><br></pre></td></tr></table></figure>
+
+<p>正常情况下，wal日志段在达到16M后会自动归档，由于测试我们使用手动切换归档。 </p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> standby</span></span><br><span class="line">ll archives/</span><br><span class="line">total 98308</span><br><span class="line">-rw------- 1 yangjie yangjie 16777216 Jan  8 14:21 000000010000000000000001</span><br><span class="line">-rw------- 1 yangjie yangjie 16777216 Jan  8 14:21 000000010000000000000002</span><br><span class="line">-rw------- 1 yangjie yangjie      330 Jan  8 14:21 000000010000000000000002.00000028.backup</span><br><span class="line">-rw------- 1 yangjie yangjie 16777216 Jan  8 14:22 000000010000000000000003</span><br><span class="line">-rw------- 1 yangjie yangjie 16777216 Jan  8 14:23 000000010000000000000004</span><br><span class="line">-rw------- 1 yangjie yangjie 16777216 Jan  8 14:23 000000010000000000000005</span><br><span class="line">-rw------- 1 yangjie yangjie 16777216 Jan  8 14:27 000000010000000000000006</span><br></pre></td></tr></table></figure>
+
+<p>修改备库配置文件</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> standby </span></span><br><span class="line"><span class="meta">#</span><span class="bash"> recovery.conf</span></span><br><span class="line">standby_mode = 'off'</span><br><span class="line">primary_conninfo = 'host=''young-91'' user=repmgr application_name=young90 connect_timeout=2'</span><br><span class="line">recovery_target_time = '2019-01-08 14:26:00'</span><br><span class="line">restore_command = 'cp /work/pgsql/pgsql-11-stable/archives/%f %p'</span><br><span class="line"></span><br><span class="line"><span class="meta">#</span><span class="bash"> postgresql.conf</span></span><br><span class="line"><span class="meta">#</span><span class="bash">archive_mode = on</span></span><br><span class="line"><span class="meta">#</span><span class="bash">archive_command = <span class="string">'ssh young-90 test ! -f /work/pgsql/pgsql-11-stable/archives/%f &amp;&amp; scp %p young-90:/work/pgsql/pgsql-11-stable/archives/%f'</span></span></span><br></pre></td></tr></table></figure>
+
+<p>重启备库</p>
+<p>会进行PITR恢复到指定的时间点</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> standby</span></span><br><span class="line">[yangjie@young-90 bin]$ ./pg_ctl -D ../data/ start</span><br><span class="line">waiting for server to start....</span><br><span class="line">2019-01-08 14:29:33.364 CST [24910] LOG:  listening on IPv4 address "0.0.0.0", port 5432</span><br><span class="line">2019-01-08 14:29:33.364 CST [24910] LOG:  listening on IPv6 address "::", port 5432</span><br><span class="line">2019-01-08 14:29:33.366 CST [24910] LOG:  listening on Unix socket "/tmp/.s.PGSQL.5432"</span><br><span class="line">2019-01-08 14:29:33.385 CST [24911] LOG:  database system was interrupted while in recovery at log time 2019-01-08 14:21:30 CST</span><br><span class="line">2019-01-08 14:29:33.385 CST [24911] HINT:  If this has occurred more than once some data might be corrupted AND you might need to choose an earlier recovery target.</span><br><span class="line">2019-01-08 14:29:33.556 CST [24911] LOG:  starting point-in-time recovery to 2019-01-08 14:26:00+08</span><br><span class="line">2019-01-08 14:29:33.570 CST [24911] LOG:  restored log file "000000010000000000000002" FROM archive</span><br><span class="line">2019-01-08 14:29:33.585 CST [24911] LOG:  redo starts at 0/2000028</span><br><span class="line">2019-01-08 14:29:33.599 CST [24911] LOG:  restored log file "000000010000000000000003" FROM archive</span><br><span class="line">2019-01-08 14:29:33.630 CST [24911] LOG:  restored log file "000000010000000000000004" FROM archive</span><br><span class="line">2019-01-08 14:29:33.662 CST [24911] LOG:  restored log file "000000010000000000000005" FROM archive</span><br><span class="line">2019-01-08 14:29:33.694 CST [24911] LOG:  restored log file "000000010000000000000006" FROM archive</span><br><span class="line">2019-01-08 14:29:33.709 CST [24911] LOG:  consistent recovery state reached at 0/6000060</span><br><span class="line">2019-01-08 14:29:33.709 CST [24911] LOG:  recovery stopping before commit of transaction 584, time 2019-01-08 14:26:57.560463+08</span><br><span class="line">2019-01-08 14:29:33.709 CST [24911] LOG:  recovery has paused</span><br><span class="line">2019-01-08 14:29:33.709 CST [24911] HINT:  Execute pg_wal_replay_resume() to continue.</span><br><span class="line">2019-01-08 14:29:33.709 CST [24910] LOG:  database system is ready to accept read only connections</span><br><span class="line"> done</span><br><span class="line">server started</span><br><span class="line">[yangjie@young-90 bin]$ ./psql postgres</span><br><span class="line">psql (11.1)</span><br><span class="line">Type "help" for help.</span><br><span class="line"></span><br><span class="line">postgres=# SELECT * FROM test_pitr;</span><br><span class="line"> id |             ts             </span><br><span class="line">----+----------------------------</span><br><span class="line">  1 | 2019-01-08 14:22:57.734731</span><br><span class="line">  2 | 2019-01-08 14:23:00.598715</span><br><span class="line">  3 | 2019-01-08 14:23:29.175027</span><br><span class="line">  4 | 2019-01-08 14:23:32.25439</span><br><span class="line">(4 rows)</span><br></pre></td></tr></table></figure>
+
+<h3 id="闪回查询"><a href="#闪回查询" class="headerlink" title="闪回查询"></a>闪回查询</h3><p>闪回查询</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> <span class="keyword">test</span> <span class="keyword">VALUES</span> (<span class="number">1</span>, <span class="string">'jinan'</span>, <span class="keyword">now</span>());</span><br><span class="line"><span class="keyword">INSERT</span> <span class="number">0</span> <span class="number">1</span></span><br><span class="line"><span class="keyword">SELECT</span> xmin,xmax,* <span class="keyword">FROM</span> <span class="keyword">test</span> ;</span><br><span class="line"> xmin | xmax | id |  tx   |             ts             </span><br><span class="line"><span class="comment">------+------+----+-------+----------------------------</span></span><br><span class="line">  638 |    0 |  1 | jinan | 2018-07-26 11:12:09.749414</span><br><span class="line">(1 row)</span><br><span class="line"></span><br><span class="line"><span class="keyword">update</span> <span class="keyword">test</span> <span class="keyword">SET</span> tx = <span class="string">'hangzhou'</span>, ts = <span class="keyword">now</span>() <span class="keyword">WHERE</span> <span class="keyword">id</span> = <span class="number">1</span>;</span><br><span class="line"><span class="keyword">UPDATE</span> <span class="number">1</span></span><br><span class="line"><span class="keyword">SELECT</span> xmin,xmax,* <span class="keyword">FROM</span> <span class="keyword">test</span> ;</span><br><span class="line"> xmin | xmax | id |    tx    |            ts             </span><br><span class="line"><span class="comment">------+------+----+----------+---------------------------</span></span><br><span class="line">  639 |    0 |  1 | hangzhou | 2018-07-26 11:12:26.66156</span><br><span class="line">(1 row)</span><br><span class="line"></span><br><span class="line"><span class="keyword">update</span> <span class="keyword">test</span> <span class="keyword">SET</span> tx = <span class="string">'beijing'</span>, ts = <span class="keyword">now</span>() <span class="keyword">WHERE</span> <span class="keyword">id</span> = <span class="number">1</span>;</span><br><span class="line"><span class="keyword">UPDATE</span> <span class="number">1</span></span><br><span class="line"><span class="keyword">SELECT</span> xmin,xmax,* <span class="keyword">FROM</span> <span class="keyword">test</span> ;</span><br><span class="line"> xmin | xmax | id |   tx    |             ts             </span><br><span class="line"><span class="comment">------+------+----+---------+----------------------------</span></span><br><span class="line">  640 |    0 |  1 | beijing | 2018-07-26 11:12:36.117637</span><br><span class="line">(1 row)</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 指定时间点闪回查询</span></span><br><span class="line"><span class="keyword">SELECT</span> * <span class="keyword">FROM</span> <span class="keyword">test</span> <span class="keyword">AS</span> <span class="keyword">OF</span> <span class="built_in">TIMESTAMP</span> <span class="string">'2018-07-26 11:12:10'</span>;</span><br><span class="line"> id |  tx   |             ts             </span><br><span class="line"><span class="comment">----+-------+----------------------------</span></span><br><span class="line">  1 | jinan | 2018-07-26 11:12:09.749414</span><br><span class="line">(1 row)</span><br><span class="line"></span><br><span class="line"><span class="keyword">SELECT</span> * <span class="keyword">FROM</span> <span class="keyword">test</span> <span class="keyword">AS</span> <span class="keyword">OF</span> <span class="built_in">TIMESTAMP</span> <span class="string">'2018-07-26 11:12:30'</span>;</span><br><span class="line"> id |    tx    |            ts             </span><br><span class="line"><span class="comment">----+----------+---------------------------</span></span><br><span class="line">  1 | hangzhou | 2018-07-26 11:12:26.66156</span><br><span class="line">(1 row)</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 指定事务号闪回查询</span></span><br><span class="line"><span class="keyword">SELECT</span> * <span class="keyword">FROM</span> <span class="keyword">test</span> <span class="keyword">AS</span> <span class="keyword">OF</span> XID <span class="number">638</span>;</span><br><span class="line"> id |  tx   |             ts             </span><br><span class="line"><span class="comment">----+-------+----------------------------</span></span><br><span class="line">  1 | jinan | 2018-07-26 11:12:09.749414</span><br><span class="line">(1 row)</span><br><span class="line"></span><br><span class="line"><span class="keyword">SELECT</span> * <span class="keyword">FROM</span> <span class="keyword">test</span> <span class="keyword">AS</span> <span class="keyword">OF</span> XID <span class="number">639</span>;</span><br><span class="line"> id |    tx    |            ts             </span><br><span class="line"><span class="comment">----+----------+---------------------------</span></span><br><span class="line">  1 | hangzhou | 2018-07-26 11:12:26.66156</span><br><span class="line">(1 row)</span><br></pre></td></tr></table></figure>
+
+<p>闪回版本查询</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 指定时间段闪回版本查询</span></span><br><span class="line"><span class="keyword">SELECT</span> * <span class="keyword">FROM</span> <span class="keyword">test</span> </span><br><span class="line"><span class="keyword">VERSIONS</span> <span class="keyword">BETWEEN</span> <span class="built_in">TIMESTAMP</span> </span><br><span class="line">	<span class="string">'2018-07-26 11:12:05'</span> </span><br><span class="line">	<span class="keyword">AND</span> <span class="string">'2018-07-26 11:12:40'</span> </span><br><span class="line"><span class="keyword">WHERE</span> <span class="keyword">id</span> = <span class="number">1</span>;</span><br><span class="line"> id |    tx    |             ts             </span><br><span class="line"><span class="comment">----+----------+----------------------------</span></span><br><span class="line">  1 | jinan    | 2018-07-26 11:12:09.749414</span><br><span class="line">  1 | hangzhou | 2018-07-26 11:12:26.66156</span><br><span class="line">  1 | beijing  | 2018-07-26 11:12:36.117637</span><br><span class="line">(3 rows)</span><br><span class="line"></span><br><span class="line"><span class="keyword">SELECT</span> * <span class="keyword">FROM</span> <span class="keyword">test</span> </span><br><span class="line"><span class="keyword">VERSIONS</span> <span class="keyword">BETWEEN</span> <span class="built_in">TIMESTAMP</span> </span><br><span class="line">	<span class="string">'2018-07-26 11:12:05'</span> </span><br><span class="line">	<span class="keyword">AND</span> <span class="string">'2018-07-26 11:12:30'</span> </span><br><span class="line"><span class="keyword">WHERE</span> <span class="keyword">id</span> = <span class="number">1</span>;</span><br><span class="line"> id |    tx    |             ts             </span><br><span class="line"><span class="comment">----+----------+----------------------------</span></span><br><span class="line">  1 | jinan    | 2018-07-26 11:12:09.749414</span><br><span class="line">  1 | hangzhou | 2018-07-26 11:12:26.66156</span><br><span class="line">(2 rows)</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 指定事务号闪回版本查询</span></span><br><span class="line"><span class="keyword">SELECT</span> * <span class="keyword">FROM</span> <span class="keyword">test</span> </span><br><span class="line"><span class="keyword">VERSIONS</span> <span class="keyword">BETWEEN</span> XID  </span><br><span class="line">	<span class="number">638</span> <span class="keyword">AND</span> <span class="number">640</span> </span><br><span class="line"><span class="keyword">WHERE</span> <span class="keyword">id</span> = <span class="number">1</span>;</span><br><span class="line"> id |    tx    |             ts             </span><br><span class="line"><span class="comment">----+----------+----------------------------</span></span><br><span class="line">  1 | jinan    | 2018-07-26 11:12:09.749414</span><br><span class="line">  1 | hangzhou | 2018-07-26 11:12:26.66156</span><br><span class="line">  1 | beijing  | 2018-07-26 11:12:36.117637</span><br><span class="line">(3 rows)</span><br><span class="line"></span><br><span class="line"><span class="keyword">SELECT</span> * <span class="keyword">FROM</span> <span class="keyword">test</span> </span><br><span class="line"><span class="keyword">VERSIONS</span> <span class="keyword">BETWEEN</span> XID</span><br><span class="line">	<span class="number">638</span> <span class="keyword">AND</span> <span class="number">639</span> </span><br><span class="line"><span class="keyword">WHERE</span> <span class="keyword">id</span> = <span class="number">1</span>;</span><br><span class="line"> id |    tx    |             ts             </span><br><span class="line"><span class="comment">----+----------+----------------------------</span></span><br><span class="line">  1 | jinan    | 2018-07-26 11:12:09.749414</span><br><span class="line">  1 | hangzhou | 2018-07-26 11:12:26.66156</span><br><span class="line">(2 rows)</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 一个事务中多次修改</span></span><br><span class="line"><span class="keyword">SELECT</span> xmin,xmax,* <span class="keyword">FROM</span> <span class="keyword">test</span>;</span><br><span class="line"> xmin | xmax | id |   tx    |             ts             </span><br><span class="line"><span class="comment">------+------+----+---------+----------------------------</span></span><br><span class="line">  648 |    0 |  1 | beijing | 2018-07-26 13:35:24.015878</span><br><span class="line">(1 row)</span><br><span class="line"></span><br><span class="line"><span class="keyword">begin</span>;</span><br><span class="line"><span class="keyword">BEGIN</span></span><br><span class="line"><span class="keyword">update</span> <span class="keyword">test</span> <span class="keyword">SET</span> tx = <span class="string">'jinan'</span> <span class="keyword">WHERE</span> <span class="keyword">id</span> = <span class="number">1</span>;</span><br><span class="line"><span class="keyword">UPDATE</span> <span class="number">1</span></span><br><span class="line"><span class="keyword">update</span> <span class="keyword">test</span> <span class="keyword">SET</span> tx = <span class="string">'hangzhou'</span> <span class="keyword">WHERE</span> <span class="keyword">id</span> = <span class="number">1</span>;</span><br><span class="line"><span class="keyword">UPDATE</span> <span class="number">1</span></span><br><span class="line"><span class="keyword">COMMIT</span>;</span><br><span class="line"><span class="keyword">COMMIT</span></span><br><span class="line"><span class="keyword">SELECT</span> xmin,xmax,* <span class="keyword">FROM</span> <span class="keyword">test</span>;</span><br><span class="line"> xmin | xmax | id |    tx    |             ts             </span><br><span class="line"><span class="comment">------+------+----+----------+----------------------------</span></span><br><span class="line">  649 |    0 |  1 | hangzhou | 2018-07-26 13:35:24.015878</span><br><span class="line">(1 row)</span><br><span class="line"></span><br><span class="line"><span class="keyword">SELECT</span> xmin,xmax,* <span class="keyword">FROM</span> <span class="keyword">test</span> </span><br><span class="line"><span class="keyword">VERSIONS</span> <span class="keyword">BETWEEN</span> <span class="built_in">TIMESTAMP</span></span><br><span class="line">	<span class="string">'2018-07-26 13:35:00'</span> </span><br><span class="line">	<span class="keyword">AND</span> <span class="string">'2018-07-26 13:37:00'</span>;</span><br><span class="line"> xmin | xmax | id |    tx    |             ts             </span><br><span class="line"><span class="comment">------+------+----+----------+----------------------------</span></span><br><span class="line">  648 |  649 |  1 | beijing  | 2018-07-26 13:35:24.015878</span><br><span class="line">  649 |    0 |  1 | hangzhou | 2018-07-26 13:35:24.015878</span><br><span class="line">(2 rows)</span><br><span class="line"><span class="comment">-- jinan并不是一个版本，因为没有提交</span></span><br></pre></td></tr></table></figure>
+
+
+
+<h2 id="相关链接"><a href="#相关链接" class="headerlink" title="相关链接"></a>相关链接</h2><p><a href="https://repmgr.org/" target="_blank" rel="noopener">https://repmgr.org/</a></p>
+<p><a href="https://www.postgresql.org/docs/current/standby-settings.html" target="_blank" rel="noopener">https://www.postgresql.org/docs/current/standby-settings.html</a></p>
+<p><a href="https://www.postgresql.org/docs/current/continuous-archiving.html" target="_blank" rel="noopener">https://www.postgresql.org/docs/current/continuous-archiving.html</a></p>
+<p><a href="https://www.postgresql.org/message-id/88AAF14A-0D49-4538-9C63-58535CF6686C@highgo.com" target="_blank" rel="noopener">https://www.postgresql.org/message-id/88AAF14A-0D49-4538-9C63-58535CF6686C@highgo.com</a></p>
+
+    </div>
+
+    
+    
+    
+      
+        <div class="reward-container">
+  <div></div>
+  <button disable="enable" onclick="var qr = document.getElementById(&quot;qr&quot;); qr.style.display = (qr.style.display === 'none') ? 'block' : 'none';">
+    打赏
+  </button>
+  <div id="qr" style="display: none;">
+      
+      <div style="display: inline-block;">
+        <img src="/images/wechatpay.jpg" alt="Yang Jie 微信支付">
+        <p>微信支付</p>
+      </div>
+
+  </div>
+</div>
+
+        
+
+<div>
+<ul class="post-copyright">
+  <li class="post-copyright-author">
+    <strong>本文作者： </strong>Yang Jie
+  </li>
+  <li class="post-copyright-link">
+    <strong>本文链接：</strong>
+    <a href="http://blog.yonj1e.top/2018/12/29/misoperation-recovery/" title="浅谈数据库误操作恢复">http://blog.yonj1e.top/2018/12/29/misoperation-recovery/</a>
+  </li>
+  <li class="post-copyright-license">
+    <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/zh-CN" rel="noopener" target="_blank"><i class="fa fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/PITR/" rel="tag"># PITR</a>
+              <a href="/tags/FlashBack-Query/" rel="tag"># FlashBack Query</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-next post-nav-item">
+                <a href="/2018/08/20/c-language-func/" rel="next" title="PostgreSQL中的C语言函数">
+                  <i class="fa fa-chevron-left"></i> PostgreSQL中的C语言函数
+                </a>
+            </div>
+
+            <span class="post-nav-divider"></span>
+
+            <div class="post-nav-prev post-nav-item">
+                <a href="/2019/01/20/understanding-database-sharding/" rel="prev" title="了解数据库分片">
+                  了解数据库分片 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#恢复措施"><span class="nav-number">1.</span> <span class="nav-text">恢复措施</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#闪回方案"><span class="nav-number">2.</span> <span class="nav-text">闪回方案</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#基于undo"><span class="nav-number">3.</span> <span class="nav-text">基于undo</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#实例"><span class="nav-number">4.</span> <span class="nav-text">实例</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#延迟从库"><span class="nav-number">4.1.</span> <span class="nav-text">延迟从库</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#基于时间点恢复（PITR）"><span class="nav-number">4.2.</span> <span class="nav-text">基于时间点恢复（PITR）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#闪回查询"><span class="nav-number">4.3.</span> <span class="nav-text">闪回查询</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#相关链接"><span class="nav-number">5.</span> <span class="nav-text">相关链接</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <img class="site-author-image" itemprop="image" alt="Yang Jie"
+    src="/images/head.jpg">
+  <p class="site-author-name" itemprop="name">Yang Jie</p>
+  <div class="site-description" itemprop="description">Stay hungry, Stay young</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">7</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">4</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">13</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yonj1e" title="GitHub &amp;rarr; https:&#x2F;&#x2F;github.com&#x2F;yonj1e" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:yonj1e@163.com" title="E-Mail &amp;rarr; mailto:yonj1e@163.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 2016 – 
+  <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Yang Jie</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v4.0.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> v7.4.2
+  </div>
+
+        
+
+
+
+
+
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js?v=3.1.0"></script>
+  <script src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  <script src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+<script src="/js/utils.js?v=7.4.2"></script><script src="/js/motion.js?v=7.4.2"></script>
+<script src="/js/schemes/pisces.js?v=7.4.2"></script>
+<script src="/js/next-boot.js?v=7.4.2"></script><script src="/js/bookmark.js?v=7.4.2"></script>
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

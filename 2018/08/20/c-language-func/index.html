@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.0.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=7.4.2">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=7.4.2">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=7.4.2">
+  <link rel="mask-icon" href="/images/logo.svg?v=7.4.2" color="#222">
+
+<link rel="stylesheet" href="/css/main.css?v=7.4.2">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css?v=4.7.0">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Pisces',
+    version: '7.4.2',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":true,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    translation: {
+      copy_button: '复制',
+      copy_success: '复制成功',
+      copy_failure: '复制失败'
+    },
+    sidebarPadding: 40
+  };
+</script>
+
+  <meta name="description" content="官方文档 之前在做定时任务时，用到了C语言函数。 contrib目录下很多插件都是用到了c语言函数。 以扩展中使用c语言函数为例：  sql文件创建函数 c文件编写函数实现 编译扩展生成.so文件，create extension时调用sql创建函数。  简单示例1234CREATE FUNCTION xfunc_add(bigint, bigint)RETURNS bigint AS &amp;apos;$lib">
+<meta name="keywords" content="C-Language Functions">
+<meta property="og:type" content="article">
+<meta property="og:title" content="PostgreSQL中的C语言函数">
+<meta property="og:url" content="http:&#x2F;&#x2F;blog.yonj1e.top&#x2F;2018&#x2F;08&#x2F;20&#x2F;c-language-func&#x2F;index.html">
+<meta property="og:site_name" content="Yonj1e&#39;s Blog">
+<meta property="og:description" content="官方文档 之前在做定时任务时，用到了C语言函数。 contrib目录下很多插件都是用到了c语言函数。 以扩展中使用c语言函数为例：  sql文件创建函数 c文件编写函数实现 编译扩展生成.so文件，create extension时调用sql创建函数。  简单示例1234CREATE FUNCTION xfunc_add(bigint, bigint)RETURNS bigint AS &amp;apos;$lib">
+<meta property="og:locale" content="zh-CN">
+<meta property="og:updated_time" content="2020-07-18T14:11:26.128Z">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://blog.yonj1e.top/2018/08/20/c-language-func/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true,
+    isPage: false,
+    isArchive: false
+  };
+</script>
+
+  <title>PostgreSQL中的C语言函数 | Yonj1e's Blog</title>
+  
+
+
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Yonj1e's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+        <p class="site-subtitle">PostgreSQL Developer & DBA, @ksyun.com</p>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <a role="button" class="book-mark-link book-mark-link-fixed"></a>
+
+  <a href="https://github.com/yonj1e" class="github-corner" title="Follow me on GitHub" aria-label="Follow me on GitHub" rel="noopener" target="_blank"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://blog.yonj1e.top/2018/08/20/c-language-func/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/head.jpg">
+      <meta itemprop="name" content="Yang Jie">
+      <meta itemprop="description" content="Stay hungry, Stay young">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Yonj1e's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          PostgreSQL中的C语言函数
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-08-20 00:00:00" itemprop="dateCreated datePublished" datetime="2018-08-20T00:00:00+00:00">2018-08-20</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-07-18 14:11:26" itemprop="dateModified" datetime="2020-07-18T14:11:26+00:00">2020-07-18</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/PostgreSQL/" itemprop="url" rel="index">
+                    <span itemprop="name">PostgreSQL</span>
+                  </a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p><a href="https://www.postgresql.org/docs/current/static/xfunc-c.html" target="_blank" rel="noopener">官方文档</a></p>
+<p>之前在做定时任务时，用到了C语言函数。</p>
+<p>contrib目录下很多插件都是用到了c语言函数。</p>
+<p>以扩展中使用c语言函数为例：</p>
+<ol>
+<li>sql文件创建函数</li>
+<li>c文件编写函数实现</li>
+<li>编译扩展生成.so文件，create extension时调用sql创建函数。</li>
+</ol>
+<h2 id="简单示例"><a href="#简单示例" class="headerlink" title="简单示例"></a>简单示例</h2><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">CREATE FUNCTION <span class="title">xfunc_add</span><span class="params">(bigint, bigint)</span></span></span><br><span class="line"><span class="function">RETURNS bigint </span></span><br><span class="line">AS '$libdir/xfunc', 'xfunc_add'</span><br><span class="line">LANGUAGE C STRICT;</span><br></pre></td></tr></table></figure>
+
+<p>$libdir/xfunc是生成的xfunc.so的路径，xfunc就是指xfunc.so文件，xfunc_add是C函数中的函数名</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//xfunc.c</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"postgres.h"</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"fmgr.h"</span></span></span><br><span class="line"></span><br><span class="line">PG_MODULE_MAGIC;</span><br><span class="line"></span><br><span class="line">PG_FUNCTION_INFO_V1(xfunc_add);</span><br><span class="line"></span><br><span class="line">Datum</span><br><span class="line">xfunc_add(PG_FUNCTION_ARGS)</span><br><span class="line">&#123;</span><br><span class="line">        <span class="keyword">int</span>     a = <span class="number">0</span>;</span><br><span class="line">        <span class="keyword">int</span>     b = <span class="number">0</span>;</span><br><span class="line">        <span class="keyword">int</span>     c = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">        a = PG_GETARG_INT32(<span class="number">0</span>);</span><br><span class="line">        b = PG_GETARG_INT32(<span class="number">1</span>);</span><br><span class="line">        c = a + b;c</span><br><span class="line">        PG_RETURN_INT32(c);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>从PostgreSQL 8.2 开始，动态 载入的函数要求有一个magic block。要包括一个 magic block，在写上包括 头文件fmgr.h的语句之后，在该模块的源文件写上一下内容：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">ifdef</span> PG_MODULE_MAGIC</span></span><br><span class="line"></span><br><span class="line">PG_MODULE_MAGIC;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="meta-keyword">endif</span></span></span><br></pre></td></tr></table></figure>
+
+<p>如果代码不需要针对 8.2 之前的PostgreSQL 发行版进行编译，则#ifdef可以省略</p>
+<h2 id="官方示例worker-spi"><a href="#官方示例worker-spi" class="headerlink" title="官方示例worker_spi"></a>官方示例worker_spi</h2><p>这个示例实际是spi_conn和动态创建扩展的示例。</p>
+<p>关于bgworker的介绍及开发可看这篇<a href="https://yonj1e.github.io/young/bgworker/" target="_blank" rel="noopener">博客</a>。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* src/test/modules/worker_spi/worker_spi--1.0.sql */</span></span><br><span class="line"></span><br><span class="line">-- complain <span class="keyword">if</span> script is sourced in psql, rather than via CREATE EXTENSION</span><br><span class="line">\echo Use <span class="string">"CREATE EXTENSION worker_spi"</span> to load <span class="keyword">this</span> file. \quit</span><br><span class="line"></span><br><span class="line"><span class="function">CREATE FUNCTION <span class="title">worker_spi_launch</span><span class="params">(bigint)</span></span></span><br><span class="line"><span class="function">RETURNS bigint STRICT</span></span><br><span class="line">AS 'MODULE_PATHNAME'</span><br><span class="line">LANGUAGE C;</span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"postgres.h"</span></span></span><br><span class="line"></span><br><span class="line"><span class="comment">/* These are always necessary for a bgworker */</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"miscadmin.h"</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"postmaster/bgworker.h"</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"storage/ipc.h"</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"storage/latch.h"</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"storage/lwlock.h"</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"storage/proc.h"</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"storage/shmem.h"</span></span></span><br><span class="line"></span><br><span class="line"><span class="comment">/* these headers are used by this particular worker's code */</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"access/xact.h"</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"executor/spi.h"</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"fmgr.h"</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"lib/stringinfo.h"</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"pgstat.h"</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"utils/builtins.h"</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"utils/snapmgr.h"</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"tcop/utility.h"</span></span></span><br><span class="line"></span><br><span class="line">PG_MODULE_MAGIC;</span><br><span class="line"></span><br><span class="line">PG_FUNCTION_INFO_V1(worker_spi_launch);</span><br><span class="line"></span><br><span class="line"><span class="comment">/*</span></span><br><span class="line"><span class="comment"> * Dynamically launch an SPI worker.</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line">Datum</span><br><span class="line">worker_spi_launch(PG_FUNCTION_ARGS)</span><br><span class="line">&#123;</span><br><span class="line">	int32		i = PG_GETARG_INT32(<span class="number">0</span>);</span><br><span class="line">	BackgroundWorker worker;</span><br><span class="line">	BackgroundWorkerHandle *handle;</span><br><span class="line">	BgwHandleStatus status;</span><br><span class="line">	<span class="keyword">pid_t</span>		pid;</span><br><span class="line"></span><br><span class="line">	<span class="built_in">memset</span>(&amp;worker, <span class="number">0</span>, <span class="keyword">sizeof</span>(worker));</span><br><span class="line">	worker.bgw_flags = BGWORKER_SHMEM_ACCESS |</span><br><span class="line">		BGWORKER_BACKEND_DATABASE_CONNECTION;</span><br><span class="line">	worker.bgw_start_time = BgWorkerStart_RecoveryFinished;</span><br><span class="line">	worker.bgw_restart_time = BGW_NEVER_RESTART;</span><br><span class="line">	<span class="built_in">sprintf</span>(worker.bgw_library_name, <span class="string">"worker_spi"</span>);</span><br><span class="line">	<span class="built_in">sprintf</span>(worker.bgw_function_name, <span class="string">"worker_spi_main"</span>);</span><br><span class="line">	<span class="built_in">snprintf</span>(worker.bgw_name, BGW_MAXLEN, <span class="string">"worker %d"</span>, i);</span><br><span class="line">	worker.bgw_main_arg = Int32GetDatum(i);</span><br><span class="line">	<span class="comment">/* set bgw_notify_pid so that we can use WaitForBackgroundWorkerStartup */</span></span><br><span class="line">	worker.bgw_notify_pid = MyProcPid;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (!RegisterDynamicBackgroundWorker(&amp;worker, &amp;handle))</span><br><span class="line">		PG_RETURN_NULL();</span><br><span class="line"></span><br><span class="line">	status = WaitForBackgroundWorkerStartup(handle, &amp;pid);</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (status == BGWH_STOPPED)</span><br><span class="line">		ereport(ERROR,</span><br><span class="line">				(errcode(ERRCODE_INSUFFICIENT_RESOURCES),</span><br><span class="line">				 errmsg(<span class="string">"could not start background process"</span>),</span><br><span class="line">				 errhint(<span class="string">"More details may be available in the server log."</span>)));</span><br><span class="line">	<span class="keyword">if</span> (status == BGWH_POSTMASTER_DIED)</span><br><span class="line">		ereport(ERROR,</span><br><span class="line">				(errcode(ERRCODE_INSUFFICIENT_RESOURCES),</span><br><span class="line">				 errmsg(<span class="string">"cannot start background processes without postmaster"</span>),</span><br><span class="line">				 errhint(<span class="string">"Kill all remaining database processes and restart the database."</span>)));</span><br><span class="line">	Assert(status == BGWH_STARTED);</span><br><span class="line"></span><br><span class="line">	PG_RETURN_INT32(pid);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="触发器函数"><a href="#触发器函数" class="headerlink" title="触发器函数"></a>触发器函数</h2><p><a href="https://www.postgresql.org/docs/12/trigger-interface.html" target="_blank" rel="noopener">Writing Trigger Functions in C</a></p>
+<p>在规则表发生变化时，出发reload,j将数据更新到内存</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">CREATE FUNCTION check_balance.cb_reload()</span><br><span class="line">RETURNS trigger</span><br><span class="line">AS '$libdir/check_balance', 'cb_reload'</span><br><span class="line">LANGUAGE C ;</span><br><span class="line"></span><br><span class="line">CREATE TRIGGER cb_rules_changes</span><br><span class="line">after INSERT OR UPDATE OR DELETE</span><br><span class="line">ON check_balance.rules FOR EACH ROW</span><br><span class="line">EXECUTE PROCEDURE check_balance.cb_reload();</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br></pre></td><td class="code"><pre><span class="line">PG_FUNCTION_INFO_V1(cb_reload);</span><br><span class="line"><span class="function">Datum <span class="title">cb_reload</span><span class="params">(PG_FUNCTION_ARGS)</span></span>;</span><br><span class="line"></span><br><span class="line">Datum</span><br><span class="line">cb_reload(PG_FUNCTION_ARGS)</span><br><span class="line">&#123;</span><br><span class="line">	TriggerData	*trigdata = (TriggerData *) fcinfo-&gt;context;</span><br><span class="line">	TupleDesc	tupdesc;</span><br><span class="line">	HeapTuple	rettuple;</span><br><span class="line">	HeapTuple	newtuple;</span><br><span class="line">	HeapTuple	trigtuple;</span><br><span class="line">	HeapTuple	spi_tuple;</span><br><span class="line">	SPITupleTable *spi_tuptable;</span><br><span class="line">	TupleDesc spi_tupdesc;</span><br><span class="line">	<span class="keyword">int</span>		ret;</span><br><span class="line">	<span class="keyword">int</span>		ntup;</span><br><span class="line">	<span class="keyword">int</span>		i, j;</span><br><span class="line">	StringInfoData	buf;</span><br><span class="line">	<span class="keyword">char</span>		**tup = <span class="literal">NULL</span>;</span><br><span class="line">	ruledesc        *rules = <span class="literal">NULL</span>; </span><br><span class="line">	<span class="keyword">bool</span>		isupdate, isinsert, isdelete;</span><br><span class="line"></span><br><span class="line">	<span class="comment">/* make sure it's called as a trigger at all */</span></span><br><span class="line">	<span class="keyword">if</span> (!CALLED_AS_TRIGGER(fcinfo))</span><br><span class="line">		elog(ERROR, <span class="string">"trigf: not called by trigger manager"</span>);</span><br><span class="line"></span><br><span class="line">	<span class="comment">/* tuple to return to executor */</span></span><br><span class="line">	<span class="keyword">if</span> (TRIGGER_FIRED_BY_UPDATE(trigdata-&gt;tg_event))</span><br><span class="line">		rettuple = trigdata-&gt;tg_newtuple;</span><br><span class="line">	<span class="keyword">else</span></span><br><span class="line">		rettuple = trigdata-&gt;tg_trigtuple;</span><br><span class="line"></span><br><span class="line">	tupdesc = trigdata-&gt;tg_relation-&gt;rd_att;</span><br><span class="line">	newtuple = trigdata-&gt;tg_newtuple;</span><br><span class="line">	trigtuple = trigdata-&gt;tg_trigtuple;</span><br><span class="line"></span><br><span class="line">	SPI_connect();</span><br><span class="line"></span><br><span class="line">	isupdate = TRIGGER_FIRED_BY_UPDATE(trigdata-&gt;tg_event);</span><br><span class="line">	isdelete = TRIGGER_FIRED_BY_DELETE(trigdata-&gt;tg_event);</span><br><span class="line">	isinsert = TRIGGER_FIRED_BY_INSERT(trigdata-&gt;tg_event);</span><br><span class="line">	</span><br><span class="line">	initStringInfo(&amp;buf);</span><br><span class="line">	<span class="keyword">if</span> (isupdate)</span><br><span class="line">	&#123;</span><br><span class="line">		appendStringInfo(&amp;buf, <span class="string">"select * from check_balance.rules where id != %s;"</span>, </span><br><span class="line">						SPI_getvalue(newtuple, tupdesc, <span class="number">1</span>));</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (isdelete)</span><br><span class="line">	&#123;</span><br><span class="line">		appendStringInfo(&amp;buf, <span class="string">"select * from check_balance.rules where id != %s;"</span>,</span><br><span class="line">						SPI_getvalue(trigtuple, tupdesc, <span class="number">1</span>));</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (isinsert)</span><br><span class="line">	&#123;</span><br><span class="line">		appendStringInfoString(&amp;buf, <span class="string">"select * from check_balance.rules;"</span>);</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	ret = SPI_execute(buf.data, <span class="literal">true</span>, <span class="number">0</span>);</span><br><span class="line">	pfree(buf.data);</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (ret != SPI_OK_SELECT)</span><br><span class="line">		elog(FATAL, <span class="string">"SPI_execute failed: error code %d"</span>, ret);</span><br><span class="line"></span><br><span class="line">	ntup = SPI_processed;</span><br><span class="line"></span><br><span class="line">	tup = (<span class="keyword">char</span>**)palloc0(<span class="keyword">sizeof</span>(<span class="keyword">char</span>*) * tupdesc-&gt;natts);</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (ntup != <span class="number">0</span> &amp;&amp; SPI_tuptable != <span class="literal">NULL</span>)</span><br><span class="line">	&#123;</span><br><span class="line">		spi_tuptable = SPI_tuptable;</span><br><span class="line">		spi_tupdesc = spi_tuptable-&gt;tupdesc;</span><br><span class="line">		<span class="keyword">for</span> (j = <span class="number">0</span>; j &lt; ntup; j++)</span><br><span class="line">		&#123;</span><br><span class="line">			rules = &amp;rd[j];</span><br><span class="line">			spi_tuple = spi_tuptable-&gt;vals[j];</span><br><span class="line"></span><br><span class="line">			<span class="built_in">memset</span>(&amp;rd[j], <span class="number">0</span>, <span class="keyword">sizeof</span>(ruledesc));</span><br><span class="line"></span><br><span class="line">			<span class="keyword">for</span> (i = <span class="number">1</span>; i &lt;= spi_tupdesc-&gt;natts; i++)</span><br><span class="line">			&#123;</span><br><span class="line">				tup[i<span class="number">-1</span>] = SPI_getvalue(spi_tuple, spi_tupdesc, i);</span><br><span class="line">			&#125;</span><br><span class="line"></span><br><span class="line">			<span class="built_in">memcpy</span>(rules-&gt;username, pstrdup(tup[<span class="number">1</span>]), <span class="built_in">strlen</span>(pstrdup(tup[<span class="number">1</span>])));</span><br><span class="line">			<span class="built_in">memcpy</span>(rules-&gt;startime, pstrdup(tup[<span class="number">2</span>]), <span class="built_in">strlen</span>(pstrdup(tup[<span class="number">2</span>])));</span><br><span class="line">			<span class="built_in">memcpy</span>(rules-&gt;endtime, pstrdup(tup[<span class="number">3</span>]), <span class="built_in">strlen</span>(pstrdup(tup[<span class="number">3</span>])));</span><br><span class="line">			<span class="built_in">memcpy</span>(rules-&gt;datname, pstrdup(tup[<span class="number">4</span>]), <span class="built_in">strlen</span>(pstrdup(tup[<span class="number">4</span>])));</span><br><span class="line">			<span class="built_in">memcpy</span>(rules-&gt;relnsp, pstrdup(tup[<span class="number">5</span>]), <span class="built_in">strlen</span>(pstrdup(tup[<span class="number">5</span>])));</span><br><span class="line">			<span class="built_in">memcpy</span>(rules-&gt;relname, pstrdup(tup[<span class="number">6</span>]), <span class="built_in">strlen</span>(pstrdup(tup[<span class="number">6</span>])));</span><br><span class="line">			<span class="built_in">memcpy</span>(rules-&gt;cmdtype, pstrdup(tup[<span class="number">7</span>]), <span class="built_in">strlen</span>(pstrdup(tup[<span class="number">7</span>])));</span><br><span class="line"></span><br><span class="line">			*tup = <span class="literal">NULL</span>;</span><br><span class="line"></span><br><span class="line">			elog(LOG, <span class="string">"w:%d,%s,%s,%s,%s,%s,%s,%s"</span>, </span><br><span class="line">				j,rules-&gt;username,rules-&gt;startime,rules-&gt;endtime,</span><br><span class="line">				rules-&gt;datname,rules-&gt;relnsp,rules-&gt;relname,rules-&gt;cmdtype);</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">/*</span></span><br><span class="line"><span class="comment"> 	 * trigger record</span></span><br><span class="line"><span class="comment"> 	 */</span> </span><br><span class="line">	<span class="keyword">if</span> (isupdate || isinsert)</span><br><span class="line">	&#123;</span><br><span class="line">		rules = &amp;rd[ntup];</span><br><span class="line"></span><br><span class="line">		<span class="built_in">memset</span>(&amp;rd[ntup], <span class="number">0</span>, <span class="keyword">sizeof</span>(ruledesc));</span><br><span class="line"></span><br><span class="line">		<span class="keyword">for</span> (i = <span class="number">1</span>; i &lt;= tupdesc-&gt;natts; i++)</span><br><span class="line">		&#123;</span><br><span class="line">			<span class="keyword">if</span> (isupdate)</span><br><span class="line">				tup[i<span class="number">-1</span>] = SPI_getvalue(newtuple, tupdesc, i);</span><br><span class="line">			<span class="keyword">if</span> (isinsert)</span><br><span class="line">				tup[i<span class="number">-1</span>] = SPI_getvalue(trigtuple, tupdesc, i);</span><br><span class="line">		&#125;</span><br><span class="line"></span><br><span class="line">		<span class="built_in">memcpy</span>(rules-&gt;username, pstrdup(tup[<span class="number">1</span>]), <span class="built_in">strlen</span>(pstrdup(tup[<span class="number">1</span>])));</span><br><span class="line">		<span class="built_in">memcpy</span>(rules-&gt;startime, pstrdup(tup[<span class="number">2</span>]), <span class="built_in">strlen</span>(pstrdup(tup[<span class="number">2</span>])));</span><br><span class="line">		<span class="built_in">memcpy</span>(rules-&gt;endtime, pstrdup(tup[<span class="number">3</span>]), <span class="built_in">strlen</span>(pstrdup(tup[<span class="number">3</span>])));</span><br><span class="line">		<span class="built_in">memcpy</span>(rules-&gt;datname, pstrdup(tup[<span class="number">4</span>]), <span class="built_in">strlen</span>(pstrdup(tup[<span class="number">4</span>])));</span><br><span class="line">		<span class="built_in">memcpy</span>(rules-&gt;relnsp, pstrdup(tup[<span class="number">5</span>]), <span class="built_in">strlen</span>(pstrdup(tup[<span class="number">5</span>])));</span><br><span class="line">		<span class="built_in">memcpy</span>(rules-&gt;relname, pstrdup(tup[<span class="number">6</span>]), <span class="built_in">strlen</span>(pstrdup(tup[<span class="number">6</span>])));</span><br><span class="line">		<span class="built_in">memcpy</span>(rules-&gt;cmdtype, pstrdup(tup[<span class="number">7</span>]), <span class="built_in">strlen</span>(pstrdup(tup[<span class="number">7</span>])));</span><br><span class="line"></span><br><span class="line">		*tup = <span class="literal">NULL</span>;</span><br><span class="line"></span><br><span class="line">		elog(LOG, <span class="string">"w:%d,%s,%s,%s,%s,%s,%s,%s"</span>,</span><br><span class="line">			ntup,rules-&gt;username,rules-&gt;startime,rules-&gt;endtime,</span><br><span class="line">			rules-&gt;datname,rules-&gt;relnsp,rules-&gt;relname,rules-&gt;cmdtype);</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	SPI_finish();</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> PointerGetDatum(rettuple);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+    </div>
+
+    
+    
+    
+      
+        <div class="reward-container">
+  <div></div>
+  <button disable="enable" onclick="var qr = document.getElementById(&quot;qr&quot;); qr.style.display = (qr.style.display === 'none') ? 'block' : 'none';">
+    打赏
+  </button>
+  <div id="qr" style="display: none;">
+      
+      <div style="display: inline-block;">
+        <img src="/images/wechatpay.jpg" alt="Yang Jie 微信支付">
+        <p>微信支付</p>
+      </div>
+
+  </div>
+</div>
+
+        
+
+<div>
+<ul class="post-copyright">
+  <li class="post-copyright-author">
+    <strong>本文作者： </strong>Yang Jie
+  </li>
+  <li class="post-copyright-link">
+    <strong>本文链接：</strong>
+    <a href="http://blog.yonj1e.top/2018/08/20/c-language-func/" title="PostgreSQL中的C语言函数">http://blog.yonj1e.top/2018/08/20/c-language-func/</a>
+  </li>
+  <li class="post-copyright-license">
+    <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/zh-CN" rel="noopener" target="_blank"><i class="fa fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C-Language-Functions/" rel="tag"># C-Language Functions</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-next post-nav-item">
+                <a href="/2017/08/11/hash-partition-in-pg10/" rel="next" title="基于PostgreSQL10实现hash分区">
+                  <i class="fa fa-chevron-left"></i> 基于PostgreSQL10实现hash分区
+                </a>
+            </div>
+
+            <span class="post-nav-divider"></span>
+
+            <div class="post-nav-prev post-nav-item">
+                <a href="/2018/12/29/misoperation-recovery/" rel="prev" title="浅谈数据库误操作恢复">
+                  浅谈数据库误操作恢复 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#简单示例"><span class="nav-number">1.</span> <span class="nav-text">简单示例</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#官方示例worker-spi"><span class="nav-number">2.</span> <span class="nav-text">官方示例worker_spi</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#触发器函数"><span class="nav-number">3.</span> <span class="nav-text">触发器函数</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <img class="site-author-image" itemprop="image" alt="Yang Jie"
+    src="/images/head.jpg">
+  <p class="site-author-name" itemprop="name">Yang Jie</p>
+  <div class="site-description" itemprop="description">Stay hungry, Stay young</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">7</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">4</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">13</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yonj1e" title="GitHub &amp;rarr; https:&#x2F;&#x2F;github.com&#x2F;yonj1e" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:yonj1e@163.com" title="E-Mail &amp;rarr; mailto:yonj1e@163.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 2016 – 
+  <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Yang Jie</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v4.0.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> v7.4.2
+  </div>
+
+        
+
+
+
+
+
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js?v=3.1.0"></script>
+  <script src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  <script src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+<script src="/js/utils.js?v=7.4.2"></script><script src="/js/motion.js?v=7.4.2"></script>
+<script src="/js/schemes/pisces.js?v=7.4.2"></script>
+<script src="/js/next-boot.js?v=7.4.2"></script><script src="/js/bookmark.js?v=7.4.2"></script>
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

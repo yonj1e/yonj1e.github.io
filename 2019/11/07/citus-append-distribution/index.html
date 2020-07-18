@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.0.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=7.4.2">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=7.4.2">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=7.4.2">
+  <link rel="mask-icon" href="/images/logo.svg?v=7.4.2" color="#222">
+
+<link rel="stylesheet" href="/css/main.css?v=7.4.2">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css?v=4.7.0">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Pisces',
+    version: '7.4.2',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":true,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    translation: {
+      copy_button: '复制',
+      copy_success: '复制成功',
+      copy_failure: '复制失败'
+    },
+    sidebarPadding: 40
+  };
+</script>
+
+  <meta name="description" content="https:&#x2F;&#x2F;docs.citusdata.com&#x2F;en&#x2F;latest&#x2F;develop&#x2F;append.html https:&#x2F;&#x2F;www.citusdata.com&#x2F;blog&#x2F;2016&#x2F;12&#x2F;15&#x2F;citus-replication-model-today-and-tomorrow&#x2F;  本文内容来自citus官方文档，包括一些原文翻译，简略介绍，使用示例等内容。  Abstract Append">
+<meta name="keywords" content="Sharding,Append Distribution,statement-based replication,streaming replication">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Citus中的分片策略：Append Distribution追加分配">
+<meta property="og:url" content="http:&#x2F;&#x2F;blog.yonj1e.top&#x2F;2019&#x2F;11&#x2F;07&#x2F;citus-append-distribution&#x2F;index.html">
+<meta property="og:site_name" content="Yonj1e&#39;s Blog">
+<meta property="og:description" content="https:&#x2F;&#x2F;docs.citusdata.com&#x2F;en&#x2F;latest&#x2F;develop&#x2F;append.html https:&#x2F;&#x2F;www.citusdata.com&#x2F;blog&#x2F;2016&#x2F;12&#x2F;15&#x2F;citus-replication-model-today-and-tomorrow&#x2F;  本文内容来自citus官方文档，包括一些原文翻译，简略介绍，使用示例等内容。  Abstract Append">
+<meta property="og:locale" content="zh-CN">
+<meta property="og:image" content="http:&#x2F;&#x2F;blog.yonj1e.top&#x2F;2019&#x2F;11&#x2F;07&#x2F;citus-append-distribution&#x2F;citus-batch-append-event-527c025d.jpg">
+<meta property="og:image" content="http:&#x2F;&#x2F;blog.yonj1e.top&#x2F;2019&#x2F;11&#x2F;07&#x2F;citus-append-distribution&#x2F;citus-insert-update-user-66fbd116.jpg">
+<meta property="og:image" content="http:&#x2F;&#x2F;blog.yonj1e.top&#x2F;2019&#x2F;11&#x2F;07&#x2F;citus-append-distribution&#x2F;citus-streaming-replica-setup-04917fc2.jpg">
+<meta property="og:updated_time" content="2020-07-18T14:11:26.128Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http:&#x2F;&#x2F;blog.yonj1e.top&#x2F;2019&#x2F;11&#x2F;07&#x2F;citus-append-distribution&#x2F;citus-batch-append-event-527c025d.jpg">
+
+<link rel="canonical" href="http://blog.yonj1e.top/2019/11/07/citus-append-distribution/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true,
+    isPage: false,
+    isArchive: false
+  };
+</script>
+
+  <title>Citus中的分片策略：Append Distribution追加分配 | Yonj1e's Blog</title>
+  
+
+
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Yonj1e's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+        <p class="site-subtitle">PostgreSQL Developer & DBA, @ksyun.com</p>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <a role="button" class="book-mark-link book-mark-link-fixed"></a>
+
+  <a href="https://github.com/yonj1e" class="github-corner" title="Follow me on GitHub" aria-label="Follow me on GitHub" rel="noopener" target="_blank"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://blog.yonj1e.top/2019/11/07/citus-append-distribution/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/head.jpg">
+      <meta itemprop="name" content="Yang Jie">
+      <meta itemprop="description" content="Stay hungry, Stay young">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Yonj1e's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Citus中的分片策略：Append Distribution追加分配
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2019-11-07 00:00:00" itemprop="dateCreated datePublished" datetime="2019-11-07T00:00:00+00:00">2019-11-07</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-07-18 14:11:26" itemprop="dateModified" datetime="2020-07-18T14:11:26+00:00">2020-07-18</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Citus/" itemprop="url" rel="index">
+                    <span itemprop="name">Citus</span>
+                  </a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p><a href="https://docs.citusdata.com/en/latest/develop/append.html" target="_blank" rel="noopener">https://docs.citusdata.com/en/latest/develop/append.html</a></p>
+<p><a href="https://www.citusdata.com/blog/2016/12/15/citus-replication-model-today-and-tomorrow/" target="_blank" rel="noopener">https://www.citusdata.com/blog/2016/12/15/citus-replication-model-today-and-tomorrow/</a></p>
+<blockquote>
+<p>本文内容来自citus官方文档，包括一些原文翻译，简略介绍，使用示例等内容。</p>
+</blockquote>
+<h2 id="Abstract"><a href="#Abstract" class="headerlink" title="Abstract"></a>Abstract</h2><blockquote>
+<p>Append distribution is a specialized technique which requires care to use efficiently. Hash distribution is a better choice for most situations. </p>
+<p>追加分配是一项需要谨慎有效使用的专门技术。对于大多数情况，散列分布是更好的选择。 </p>
+</blockquote>
+<p>While Citus’ most common use cases involve hash data distribution, it can also distribute timeseries data across a variable number of shards by their order in time. This section provides a short reference to loading, deleting, and manipulating timeseries data.</p>
+<p>虽然Citus最常见的用例涉及散列数据分布，但它也可以按时间顺序将timeseries数据分布在数量可变的分片上。本节提供有关加载、删除和操作timeseries数据的简短参考。</p>
+<p>As the name suggests, append based distribution is more suited to append-only use cases. This typically includes event based data which arrives in a time-ordered series. You can then distribute your largest tables by time, and batch load your events into Citus in intervals of N minutes. This data model can be generalized to a number of time series use cases; for example, each line in a website’s log file, machine activity logs or aggregated website events. Append based distribution supports more efficient range queries. This is because given a range query on the distribution key, the Citus query planner can easily determine which shards overlap that range and send the query only to relevant shards.</p>
+<p>顾名思义，基于append的分布更适合仅追加的用例。这通常包括按时间顺序到达的基于事件的数据。然后可以按时间分布最大的表，并以N分钟为间隔将事件批量加载到Citus中。该数据模型可以推广到多个时间序列用例;例如，网站日志文件中的每一行、机器活动日志或聚合的网站事件。基于附加的分布支持更有效的范围查询。这是因为，给定分布键上的范围查询，Citus查询计划器可以很容易地确定哪些分片与该范围重叠，并只将查询发送到相关的分片。</p>
+<p>Hash based distribution is more suited to cases where you want to do real-time inserts along with analytics on your data or want to distribute by a non-ordered column (eg. user id). This data model is relevant for real-time analytics use cases; for example, actions in a mobile application, user website events, or social media analytics. In this case, Citus will maintain minimum and maximum hash ranges for all the created shards. Whenever a row is inserted, updated or deleted, Citus will redirect the query to the correct shard and issue it locally. This data model is more suited for doing co-located joins and for queries involving equality based filters on the distribution column.</p>
+<p>基于散列的分布更适合于这样的情况，即您希望执行实时插入并对数据进行分析，或者希望按无序列进行分布(例如。用户id)。这个数据模型与实时分析用例相关;例如，移动应用程序中的操作、用户网站事件或社交媒体分析。在这种情况下，Citus将为所有创建的分片维护最小和最大散列范围。无论何时插入、更新或删除一行，Citus都会将查询重定向到正确的分片，并在本地发出它。此数据模型更适合于在分布列上执行协同定位连接和涉及基于等式的过滤器的查询。</p>
+<p>Citus uses slightly different syntaxes for creation and manipulation of append and hash distributed tables. Also, the operations supported on the tables differ based on the distribution method chosen. In the sections that follow, we describe the syntax for creating append distributed tables, and also describe the operations which can be done on them.</p>
+<p>Citus在创建和操作append和散列分布式表时使用的语法略有不同。此外，根据所选择的分发方法，表上支持的操作也有所不同。在接下来的小节中，我们将描述用于创建append分布式表的语法，并描述可以对其进行的操作。</p>
+<h2 id="Creating-and-Distributing-Tables"><a href="#Creating-and-Distributing-Tables" class="headerlink" title="Creating and Distributing Tables"></a>Creating and Distributing Tables</h2><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> github_events</span><br><span class="line">(</span><br><span class="line">    event_id <span class="built_in">bigint</span>,</span><br><span class="line">    event_type <span class="built_in">text</span>,</span><br><span class="line">    event_public <span class="built_in">boolean</span>,</span><br><span class="line">    repo_id <span class="built_in">bigint</span>,</span><br><span class="line">    payload jsonb,</span><br><span class="line">    repo jsonb,</span><br><span class="line">    actor jsonb,</span><br><span class="line">    org jsonb,</span><br><span class="line">    created_at <span class="built_in">timestamp</span></span><br><span class="line">);</span><br></pre></td></tr></table></figure>
+
+<p>Next, you can use the create_distributed_table() function to mark the  table as an append distributed table and specify its distribution  column. </p>
+<p>接下来，可以使用create_distributed_table()函数将该表标记为追加分布式表并指定其分布列。 </p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> create_distributed_table(<span class="string">'github_events'</span>, <span class="string">'created_at'</span>, <span class="string">'append'</span>);</span><br></pre></td></tr></table></figure>
+
+<p>This function informs Citus that the github_events table should be  distributed by append on the created_at column. Note that this method  doesn’t enforce a particular distribution; it merely tells the database  to keep minimum and maximum values for the created_at column in each  shard which are later used by the database for optimizing queries. </p>
+<p>该函数通知Citus, github_events表应该通过追加到created_at列上的方式分发。请注意，此方法并不强制执行特定的分发;它只是告诉数据库在每个分片中保留created_at列的最小值和最大值，稍后数据库将使用这些值来优化查询。 </p>
+<h2 id="Expiring-Data"><a href="#Expiring-Data" class="headerlink" title="Expiring Data"></a>Expiring Data</h2><p>In append distribution, users typically want to track data only for  the last few months / years. In such cases, the shards that are no  longer needed still occupy disk space. To address this, Citus provides a user defined function master_apply_delete_command() to delete old  shards. The function takes a <a href="http://www.postgresql.org/docs/current/static/sql-delete.html" target="_blank" rel="noopener">DELETE</a> command as input and deletes all the shards that match the delete criteria with their metadata.</p>
+<p>在append分发中，用户通常只想跟踪最近几个月/几年的数据。在这种情况下，不再需要的分片仍然占用磁盘空间。为了解决这个问题，Citus提供了一个用户定义的函数master_apply_delete_command()来删除旧分片。该函数以<a href="http://www.postgresql.org/docs/current/static/sql-delete.html" target="_blank" rel="noopener">DELETE</a>命令作为输入，并删除与删除条件匹配的所有分片及其元数据。 </p>
+<p>The function uses shard metadata to decide whether or not a shard  needs to be deleted, so it requires the WHERE clause in the DELETE  statement to be on the distribution column. If no condition is  specified, then all shards are selected for deletion. The UDF then  connects to the worker nodes and issues DROP commands for all the shards which need to be deleted. If a drop query for a particular shard  replica fails, then that replica is marked as TO DELETE. The shard  replicas which are marked as TO DELETE are not considered for future  queries and can be cleaned up later.</p>
+<p>该函数使用分片元数据来决定是否需要删除分片，因此它要求DELETE语句中的WHERE子句位于分布列上。如果没有指定任何条件，则选择删除所有分片。然后，UDF连接到工作节点，并发出删除所有需要删除的分片的命令。如果针对特定分片副本的drop查询失败，则该副本被标记为要删除。标记为要删除的shard副本不会考虑用于将来的查询，可以在以后进行清理。 </p>
+<p>The example below deletes those shards from the github_events table  which have all rows with created_at &gt;= ‘2015-01-01 00:00:00’. Note  that the table is distributed on the created_at column.</p>
+<p>下面的示例将从github_events表中删除那些包含created_at &gt;= ‘ 2015-01-01 00:00:00 ‘的所有行。注意，表分布在created_at列上。 </p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> * <span class="keyword">from</span> master_apply_delete_command(<span class="string">'DELETE FROM github_events WHERE created_at &gt;= ''2015-01-01 00:00:00'''</span>);</span><br><span class="line"> master_apply_delete_command</span><br><span class="line"><span class="comment">-----------------------------</span></span><br><span class="line">                           3</span><br><span class="line">(1 row)</span><br></pre></td></tr></table></figure>
+
+<p>To learn more about the function, its arguments and its usage, please visit the <a href="https://docs.citusdata.com/en/latest/develop/api_udf.html#user-defined-functions" target="_blank" rel="noopener">Citus Utility Functions</a> section of our documentation.  Please note that this function only  deletes complete shards and not individual rows from shards. If your use case requires deletion of individual rows in real-time, see the section below about deleting data.</p>
+<p>请注意，此函数只删除完整的分片，而不删除分片中的单个行。如果您的用例需要实时删除个别行，请参阅下面关于删除数据的部分。 </p>
+<h2 id="Deleting-Data"><a href="#Deleting-Data" class="headerlink" title="Deleting Data"></a>Deleting Data</h2><p>The most flexible way to modify or delete rows throughout a Citus cluster with regular SQL statements:</p>
+<p>最灵活的方式来修改或删除整个Citus集群的常规SQL语句行: </p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">DELETE</span> <span class="keyword">FROM</span> github_events</span><br><span class="line"><span class="keyword">WHERE</span> created_at &gt;= <span class="string">'2015-01-01 00:03:00'</span>;</span><br></pre></td></tr></table></figure>
+
+<p>Unlike master_apply_delete_command, standard SQL works at the row-  rather than shard-level to modify or delete all rows that match the  condition in the where clause. It deletes rows regardless of whether  they comprise an entire shard.</p>
+<p>与master_apply_delete_command不同，标准SQL在行上工作，而不是在分片级上修改或删除与where子句中的条件匹配的所有行。它删除行，不管它们是否包含整个分片。 </p>
+<h2 id="Dropping-Tables"><a href="#Dropping-Tables" class="headerlink" title="Dropping Tables"></a>Dropping Tables</h2><p>You can use the standard PostgreSQL <a href="http://www.postgresql.org/docs/current/static/sql-droptable.html" target="_blank" rel="noopener">DROP TABLE</a> command to remove your append distributed tables. As with regular tables, DROP TABLE removes any indexes, rules, triggers, and constraints that exist for the target table. In addition, it also drops the shards on the worker nodes and cleans up their metadata.</p>
+<p>可以使用标准的PostgreSQL <a href="http://www.postgresql.org/docs/current/static/sql-droptable.html" target="_blank" rel="noopener">DROP TABLE</a>命令删除附加的分布式表。与常规表一样，DROP表删除目标表的所有索引、规则、触发器和约束。此外，它还删除工作节点上的分片并清理它们的元数据。 </p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">DROP</span> <span class="keyword">TABLE</span> github_events;</span><br></pre></td></tr></table></figure>
+
+<h2 id="Data-Loading"><a href="#Data-Loading" class="headerlink" title="Data Loading"></a>Data Loading</h2><p>Citus supports two methods to load data into your append distributed  tables. The first one is suitable for bulk loads from files and involves using the \copy command. For use cases requiring smaller, incremental  data loads, Citus provides two user defined functions. We describe each  of the methods and their usage below.</p>
+<p>Citus支持两种方法来将数据加载到附加的分布式表中。第一种方法适用于从文件进行批量加载，并涉及到使用\copy命令。对于需要更小的增量数据负载的用例，Citus提供了两个用户定义的函数。我们将在下面描述每种方法及其用法。 </p>
+<h3 id="Bulk-load-using-copy"><a href="#Bulk-load-using-copy" class="headerlink" title="Bulk load using \copy"></a>Bulk load using \copy</h3><p>The <a href="http://www.postgresql.org/docs/current/static/app-psql.html#APP-PSQL-META-COMMANDS-COPY" target="_blank" rel="noopener">\copy</a> command is used to copy data from a file to a distributed table while handling replication and failures automatically. You can also use the server side <a href="http://www.postgresql.org/docs/current/static/sql-copy.html" target="_blank" rel="noopener">COPY command</a>. In the examples, we use the \copy command from psql, which sends a COPY  .. FROM STDIN to the server and reads files on the client side, whereas  COPY from a file would read the file on the server.</p>
+<p>[\copy](<a href="http://www.postgresql.org/docs/current/static/app-psql.html#" target="_blank" rel="noopener">http://www.postgresql.org/docs/current/static/app-psql.html#</a> app-psql - metadata - copy)命令用于将数据从文件复制到分布式表，同时自动处理复制和失败。您还可以使用服务器端<a href="http://www.postgresql.org/docs/current/static/sql-copy.html" target="_blank" rel="noopener">COPY命令</a>。在本例中，我们使用来自psql的\copy命令，它发送一个副本…从STDIN到服务器并读取客户端上的文件，而从文件复制则读取服务器上的文件。</p>
+<p>You can use \copy both on the coordinator and from any of the  workers. When using it from the worker, you need to add the master_host  option. Behind the scenes, \copy first opens a connection to the  coordinator using the provided master_host option and uses  master_create_empty_shard to create a new shard. Then, the command  connects to the workers and copies data into the replicas until the size reaches shard_max_size, at which point another new shard is created.  Finally, the command fetches statistics for the shards and updates the  metadata.</p>
+<p>您可以在协调节点和任何工作节点上使用\copy。当从工作节点中使用它时，您需要添加master_host选项。在后台，\copy首先使用提供的master_host选项打开到协调节点的连接，并使用master_create_empty_shard创建一个新的shard。然后，该命令连接到工作节点并将数据复制到副本中，直到大小达到shard_max_size，此时将创建另一个新分片。最后，该命令获取分片的统计信息并更新元数据。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SET</span> citus.shard_max_size <span class="keyword">TO</span> <span class="string">'64MB'</span>;</span><br><span class="line">\copy github_events from 'github_events-2015-01-01-0.csv' <span class="keyword">WITH</span> (<span class="keyword">format</span> CSV, master_host <span class="string">'coordinator-host'</span>)</span><br></pre></td></tr></table></figure>
+
+<p>Citus assigns a unique shard id to each new shard and all its  replicas have the same shard id. Each shard is represented on the worker node as a regular PostgreSQL table with name ‘tablename_shardid’ where  tablename is the name of the distributed table and shardid is the unique id assigned to that shard. One can connect to the worker postgres  instances to view or run commands on individual shards.</p>
+<p>Citus分配一个惟一的分片id到每个新分片及其所有副本具有相同的分片id。每个分片是工人代表节点作为常规PostgreSQL表名称的tablename_shardid分布表的表名是名字的和shardid是惟一的id分配到分片。可以连接到worker postgres实例来查看或运行单个分片上的命令。</p>
+<p>By default, the \copy command depends on two configuration parameters for its behavior. These are called citus.shard_max_size and  citus.shard_replication_factor.</p>
+<p>默认情况下，\copy命令的行为取决于两个配置参数。分别是：citus.shard_max_size 和citus.shard_replication_factor</p>
+<ol>
+<li><strong>citus.shard_max_size :-</strong> This parameter determines  the maximum size of a shard created using \copy, and defaults to 1 GB.  If the file is larger than this parameter, \copy will break it up into  multiple shards.</li>
+<li>此参数确定使用\copy创建的分片的最大大小，默认为1 GB。如果文件比这个参数大，\copy将把它分成多个分片。 </li>
+<li><strong>citus.shard_replication_factor :-</strong> This parameter  determines the number of nodes each shard gets replicated to, and  defaults to one. Set it to two if you want Citus to replicate data  automatically and provide fault tolerance. You may want to increase the  factor even higher if you run large clusters and observe node failures  on a more frequent basis.</li>
+<li>该参数决定每个shard复制到的节点数量，默认为一个。如果希望Citus自动复制数据并提供容错，请将其设置为2。如果您运行大型集群并更频繁地观察节点故障，则可能希望进一步提高这个因素。 </li>
+</ol>
+<p>The configuration setting citus.shard_replication_factor can only be set on the coordinator node.</p>
+<p>配置设置citus。shard_replication_factor只能在协调节点上设置。</p>
+<p>Please note that you can load several files in parallel through  separate database connections or from different nodes. It is also worth  noting that \copy always creates at least one shard and does not append  to existing shards. You can use the method described below to append to  previously created shards.</p>
+<p>请注意，您可以通过单独的数据库连接或从不同的节点并行加载多个文件。还值得注意的是，\copy总是创建至少一个切分，并且不会附加到现有的切分上。您可以使用下面描述的方法将之前创建的分片追加到后面。</p>
+<p>There is no notion of snapshot isolation across shards, which means  that a multi-shard SELECT that runs concurrently with a COPY might see  it committed on some shards, but not on others. If the user is storing  events data, he may occasionally observe small gaps in recent data. It  is up to applications to deal with this if it is a problem (e.g.   exclude the most recent data from queries, or use some lock).</p>
+<p>没有跨分片的快照隔离的概念，这意味着与一个副本并发运行的多分片选择可能会在一些分片上提交，而不是在其他分片上提交。如果用户正在存储事件数据，他可能会偶尔观察到最近数据中的小间隙。如果这是一个问题，则由应用程序来处理(例如，从查询中排除最近的数据，或使用一些锁)。</p>
+<p>If COPY fails to open a connection for a shard placement then it behaves in the same way as INSERT, namely to mark the  placement(s) as inactive unless there are no more active placements. If  any other failure occurs after connecting, the transaction is rolled  back and thus no metadata changes are made.</p>
+<p>如果复制无法为分片放置打开连接，那么它的行为与INSERT相同，即将放置标记为非活动的，除非没有更多的活动放置。如果连接后发生任何其他故障，则事务将回滚，因此不会对元数据进行更改。</p>
+<h3 id="Incremental-loads-by-appending-to-existing-shards"><a href="#Incremental-loads-by-appending-to-existing-shards" class="headerlink" title="Incremental loads by appending to existing shards"></a>Incremental loads by appending to existing shards</h3><p>The \copy command always creates a new shard when it is used and is  best suited for bulk loading of data. Using \copy to load smaller data  increments will result in many small shards which might not be ideal. In order to allow smaller, incremental loads into append distributed  tables, Citus provides 2 user defined functions. They are  master_create_empty_shard() and master_append_table_to_shard().</p>
+<p>当使用\copy命令时，它总是创建一个新的分片，并且最适合批量加载数据。使用\copy加载较小的数据增量将导致许多小分片，这可能不是理想的结果。为了允许向append分布式表中增加更小的负载，Citus提供了两个用户定义的函数。它们是master_create_empty_shard()和master_append_table_to_shard()。</p>
+<p>master_create_empty_shard() can be used to create new empty shards  for a table. This function also replicates the empty shard to  citus.shard_replication_factor number of nodes like the \copy command.</p>
+<p>master_create_empty_shard()可用于为表创建新的空分片。此函数还将空分片复制到citus。shard_replication_factor节点数，如\copy命令。</p>
+<p>master_append_table_to_shard() can be used to append the contents of a PostgreSQL table to an existing shard. This allows the user to control  the shard to which the rows will be appended. It also returns the shard  fill ratio which helps to make a decision on whether more data should be appended to this shard or if a new shard should be created.</p>
+<p>master_append_table_to_shard()可用于将PostgreSQL表的内容附加到现有的shard。这允许用户控制将附加行的分片。它还返回分片填充率，这有助于决定是否应该向这个分片添加更多的数据，还是应该创建一个新的分片。</p>
+<p>To use the above functionality, you can first insert incoming data  into a regular PostgreSQL table. You can then create an empty shard  using master_create_empty_shard(). Then, using  master_append_table_to_shard(), you can append the contents of the  staging table to the specified shard, and then subsequently delete the  data from the staging table. Once the shard fill ratio returned by the  append function becomes close to 1, you can create a new shard and start appending to the new one.</p>
+<p>要使用上述功能，您可以首先将传入的数据插入到常规的PostgreSQL表中。然后可以使用master_create_empty_shard()创建一个空分片。然后，使用master_append_table_to_shard()，可以将staging表的内容附加到指定的shard中，然后从staging表中删除数据。一旦append函数返回的分片填充比接近1，您就可以创建一个新的分片并开始将其附加到新的分片中。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> * <span class="keyword">from</span> master_create_empty_shard(<span class="string">'github_events'</span>);</span><br><span class="line">master_create_empty_shard</span><br><span class="line"><span class="comment">---------------------------</span></span><br><span class="line">                102089</span><br><span class="line">(1 row)</span><br><span class="line"></span><br><span class="line"><span class="keyword">SELECT</span> * <span class="keyword">from</span> master_append_table_to_shard(<span class="number">102089</span>, <span class="string">'github_events_temp'</span>, <span class="string">'master-101'</span>, <span class="number">5432</span>);</span><br><span class="line">master_append_table_to_shard</span><br><span class="line"><span class="comment">------------------------------</span></span><br><span class="line">        0.100548</span><br><span class="line">(1 row)</span><br></pre></td></tr></table></figure>
+
+<p>To learn more about the two UDFs, their arguments and usage, please visit the <a href="https://docs.citusdata.com/en/latest/develop/api_udf.html#user-defined-functions" target="_blank" rel="noopener">Citus Utility Functions</a> section of the documentation.</p>
+<h2 id="Example"><a href="#Example" class="headerlink" title="Example"></a>Example</h2><h3 id="Range-Based-Sharding"><a href="#Range-Based-Sharding" class="headerlink" title="Range Based Sharding"></a>Range Based Sharding</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br></pre></td><td class="code"><pre><span class="line">young=<span class="comment"># create table test(id int, ts timestamptz);</span></span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span></span><br><span class="line">young=<span class="comment"># SELECT create_distributed_table('test', 'ts', 'append');</span></span><br><span class="line"><span class="keyword">NOTICE</span>:  <span class="keyword">using</span> <span class="keyword">statement</span>-based <span class="keyword">replication</span></span><br><span class="line">DETAIL:  Streaming <span class="keyword">replication</span> <span class="keyword">is</span> supported <span class="keyword">only</span> <span class="keyword">for</span> <span class="keyword">hash</span>-<span class="keyword">distributed</span> tables.</span><br><span class="line"> create_distributed_table </span><br><span class="line"><span class="comment">--------------------------</span></span><br><span class="line"> </span><br><span class="line">(<span class="number">1</span> <span class="keyword">row</span>)</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># SELECT * from master_create_empty_shard('test');</span></span><br><span class="line"> master_create_empty_shard </span><br><span class="line"><span class="comment">---------------------------</span></span><br><span class="line">                    <span class="number">102046</span></span><br><span class="line">(<span class="number">1</span> <span class="keyword">row</span>)</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># insert into test values (1, now());</span></span><br><span class="line"><span class="keyword">INSERT</span> <span class="number">0</span> <span class="number">1</span></span><br><span class="line">young=<span class="comment"># table test ;</span></span><br><span class="line"> <span class="keyword">id</span> |              ts               </span><br><span class="line"><span class="comment">----+-------------------------------</span></span><br><span class="line">  <span class="number">1</span> | <span class="number">2019</span><span class="number">-11</span><span class="number">-07</span> <span class="number">15</span>:<span class="number">02</span>:<span class="number">23.850578</span>+<span class="number">08</span></span><br><span class="line">(<span class="number">1</span> <span class="keyword">row</span>)</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># table pg_dist_shard;</span></span><br><span class="line"> logicalrelid | shardid | shardstorage | shardminvalue | shardmaxvalue </span><br><span class="line"><span class="comment">--------------+---------+--------------+---------------+---------------</span></span><br><span class="line"> <span class="keyword">test</span>         |  <span class="number">102046</span> | t            |               | </span><br><span class="line">(<span class="number">1</span> <span class="keyword">row</span>)</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># insert into test values (2, now());</span></span><br><span class="line"><span class="keyword">INSERT</span> <span class="number">0</span> <span class="number">1</span></span><br><span class="line">young=<span class="comment"># SELECT                             </span></span><br><span class="line">    n.nodename,</span><br><span class="line">    n.nodeport,</span><br><span class="line">    <span class="keyword">sum</span>(foo.result::int4)</span><br><span class="line"><span class="keyword">FROM</span> (</span><br><span class="line">    <span class="keyword">SELECT</span> *</span><br><span class="line">    <span class="keyword">FROM</span></span><br><span class="line">        run_command_on_shards (<span class="string">'test'</span>,</span><br><span class="line">            <span class="string">'select count(*) from %s'</span>)) <span class="keyword">AS</span> foo,</span><br><span class="line">    pg_dist_placement p,</span><br><span class="line">    pg_dist_node n</span><br><span class="line"><span class="keyword">WHERE</span></span><br><span class="line">    foo.shardid = p.shardid</span><br><span class="line">    <span class="keyword">AND</span> p.groupid = n.groupid</span><br><span class="line"><span class="keyword">GROUP</span> <span class="keyword">BY</span></span><br><span class="line">    n.nodename,</span><br><span class="line">    n.nodeport;</span><br><span class="line"> nodename | nodeport | sum </span><br><span class="line"><span class="comment">----------+----------+-----</span></span><br><span class="line"> 10.0.0.5 |     9432 |   2</span><br><span class="line">(1 row)</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># SELECT * from master_create_empty_shard('test');</span></span><br><span class="line"> master_create_empty_shard </span><br><span class="line"><span class="comment">---------------------------</span></span><br><span class="line">                    102047</span><br><span class="line">(1 row)</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># insert into test values (3, now());             </span></span><br><span class="line">ERROR:  cannot run <span class="keyword">INSERT</span> command which targets multiple shards</span><br><span class="line">HINT:  Make sure the <span class="keyword">value</span> <span class="keyword">for</span> <span class="keyword">partition</span> <span class="keyword">column</span> <span class="string">"ts"</span> falls <span class="keyword">into</span> a single shard.</span><br><span class="line">young=<span class="comment"># table pg_dist_shard;</span></span><br><span class="line"> logicalrelid | shardid | shardstorage | shardminvalue | shardmaxvalue </span><br><span class="line"><span class="comment">--------------+---------+--------------+---------------+---------------</span></span><br><span class="line"> <span class="keyword">test</span>         |  <span class="number">102046</span> | t            |               | </span><br><span class="line"> <span class="keyword">test</span>         |  <span class="number">102047</span> | t            |               | </span><br><span class="line">(<span class="number">2</span> <span class="keyword">rows</span>)</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># select min(ts), max(ts) from test;</span></span><br><span class="line">              <span class="keyword">min</span>              |              <span class="keyword">max</span>              </span><br><span class="line"><span class="comment">-------------------------------+-------------------------------</span></span><br><span class="line"> <span class="number">2019</span><span class="number">-11</span><span class="number">-07</span> <span class="number">15</span>:<span class="number">02</span>:<span class="number">23.850578</span>+<span class="number">08</span> | <span class="number">2019</span><span class="number">-11</span><span class="number">-07</span> <span class="number">15</span>:<span class="number">03</span>:<span class="number">46.776405</span>+<span class="number">08</span></span><br><span class="line">(<span class="number">1</span> <span class="keyword">row</span>)</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># update pg_dist_shard set shardminvalue = '2019-11-07 15:00:00', shardmaxvalue = '2019-11-07 15:04:59' where shardid = 102046;</span></span><br><span class="line"><span class="keyword">UPDATE</span> <span class="number">1</span></span><br><span class="line">young=<span class="comment"># table pg_dist_shard;</span></span><br><span class="line"> logicalrelid | shardid | shardstorage |    shardminvalue    |    shardmaxvalue    </span><br><span class="line"><span class="comment">--------------+---------+--------------+---------------------+---------------------</span></span><br><span class="line"> <span class="keyword">test</span>         |  <span class="number">102047</span> | t            |                     | </span><br><span class="line"> <span class="keyword">test</span>         |  <span class="number">102046</span> | t            | <span class="number">2019</span><span class="number">-11</span><span class="number">-07</span> <span class="number">15</span>:<span class="number">00</span>:<span class="number">00</span> | <span class="number">2019</span><span class="number">-11</span><span class="number">-07</span> <span class="number">15</span>:<span class="number">04</span>:<span class="number">59</span></span><br><span class="line">(<span class="number">2</span> <span class="keyword">rows</span>)</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># SELECT                                          </span></span><br><span class="line">    n.nodename,</span><br><span class="line">    n.nodeport,</span><br><span class="line">    <span class="keyword">sum</span>(foo.result::int4)</span><br><span class="line"><span class="keyword">FROM</span> (</span><br><span class="line">    <span class="keyword">SELECT</span> *</span><br><span class="line">    <span class="keyword">FROM</span></span><br><span class="line">        run_command_on_shards (<span class="string">'test'</span>,</span><br><span class="line">            <span class="string">'select count(*) from %s'</span>)) <span class="keyword">AS</span> foo,</span><br><span class="line">    pg_dist_placement p,</span><br><span class="line">    pg_dist_node n</span><br><span class="line"><span class="keyword">WHERE</span></span><br><span class="line">    foo.shardid = p.shardid</span><br><span class="line">    <span class="keyword">AND</span> p.groupid = n.groupid</span><br><span class="line"><span class="keyword">GROUP</span> <span class="keyword">BY</span></span><br><span class="line">    n.nodename,</span><br><span class="line">    n.nodeport;</span><br><span class="line"> nodename  | nodeport | sum </span><br><span class="line"><span class="comment">-----------+----------+-----</span></span><br><span class="line"> 10.0.0.5  |     9432 |   2</span><br><span class="line"> 10.0.0.10 |     9432 |   1</span><br><span class="line">(2 rows)</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># update pg_dist_shard set shardminvalue = '2019-11-07 15:05:00', shardmaxvalue = '2019-11-07 15:09:59' where shardid = 102047;</span></span><br><span class="line"><span class="keyword">UPDATE</span> <span class="number">1</span></span><br><span class="line">young=<span class="comment"># table pg_dist_shard;</span></span><br><span class="line"> logicalrelid | shardid | shardstorage |    shardminvalue    |    shardmaxvalue    </span><br><span class="line"><span class="comment">--------------+---------+--------------+---------------------+---------------------</span></span><br><span class="line"> <span class="keyword">test</span>         |  <span class="number">102046</span> | t            | <span class="number">2019</span><span class="number">-11</span><span class="number">-07</span> <span class="number">15</span>:<span class="number">00</span>:<span class="number">00</span> | <span class="number">2019</span><span class="number">-11</span><span class="number">-07</span> <span class="number">15</span>:<span class="number">04</span>:<span class="number">59</span></span><br><span class="line"> <span class="keyword">test</span>         |  <span class="number">102047</span> | t            | <span class="number">2019</span><span class="number">-11</span><span class="number">-07</span> <span class="number">15</span>:<span class="number">05</span>:<span class="number">00</span> | <span class="number">2019</span><span class="number">-11</span><span class="number">-07</span> <span class="number">15</span>:<span class="number">09</span>:<span class="number">59</span></span><br><span class="line">(<span class="number">2</span> <span class="keyword">rows</span>)</span><br></pre></td></tr></table></figure>
+<p>文档有介绍删除分片、删除数据及删除表，未介绍TRUNCATE</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">young=<span class="comment"># table pg_dist_shard;</span></span><br><span class="line"> logicalrelid | shardid | shardstorage |    shardminvalue    |    shardmaxvalue    </span><br><span class="line"><span class="comment">--------------+---------+--------------+---------------------+---------------------</span></span><br><span class="line"> test         |  102046 | t            | 2019-11-07 15:00:00 | 2019-11-07 15:04:59</span><br><span class="line"> test         |  102047 | t            | 2019-11-07 15:05:00 | 2019-11-07 15:09:59</span><br><span class="line">(2 rows)</span><br><span class="line">young=<span class="comment"># truncate test ;</span></span><br><span class="line"><span class="keyword">TRUNCATE</span> <span class="keyword">TABLE</span></span><br><span class="line">young=<span class="comment"># table pg_dist_shard;</span></span><br><span class="line"> logicalrelid | shardid | shardstorage | shardminvalue | shardmaxvalue </span><br><span class="line"><span class="comment">--------------+---------+--------------+---------------+---------------</span></span><br><span class="line">(<span class="number">0</span> <span class="keyword">rows</span>)</span><br></pre></td></tr></table></figure>
+
+
+
+<h3 id="Directory-Based-Sharding"><a href="#Directory-Based-Sharding" class="headerlink" title="Directory Based Sharding"></a>Directory Based Sharding</h3><p>这与基于范围的分片类似，但不是确定分片键的数据属于哪个范围，而是将每个键绑定到其自己的特定分片。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line">young=<span class="comment"># create table list(id int, col text);</span></span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span></span><br><span class="line">young=<span class="comment"># SELECT create_distributed_table('list', 'col', 'append');</span></span><br><span class="line"><span class="keyword">NOTICE</span>:  <span class="keyword">using</span> <span class="keyword">statement</span>-based <span class="keyword">replication</span></span><br><span class="line">DETAIL:  Streaming <span class="keyword">replication</span> <span class="keyword">is</span> supported <span class="keyword">only</span> <span class="keyword">for</span> <span class="keyword">hash</span>-<span class="keyword">distributed</span> tables.</span><br><span class="line"> create_distributed_table </span><br><span class="line"><span class="comment">--------------------------</span></span><br><span class="line"> </span><br><span class="line">(<span class="number">1</span> <span class="keyword">row</span>)</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># select master_create_empty_shard('list');</span></span><br><span class="line"> master_create_empty_shard </span><br><span class="line"><span class="comment">---------------------------</span></span><br><span class="line">                    <span class="number">102052</span></span><br><span class="line">(<span class="number">1</span> <span class="keyword">row</span>)</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># update pg_dist_shard set shardminvalue = 'beijing', shardmaxvalue = 'beijing' where shardid = 102052;</span></span><br><span class="line"><span class="keyword">UPDATE</span> <span class="number">1</span></span><br><span class="line">young=<span class="comment"># table pg_dist_shard;</span></span><br><span class="line"> logicalrelid | shardid | shardstorage | shardminvalue | shardmaxvalue </span><br><span class="line"><span class="comment">--------------+---------+--------------+---------------+---------------</span></span><br><span class="line"> <span class="keyword">list</span>         |  <span class="number">102052</span> | t            | beijing       | beijing</span><br><span class="line">(<span class="number">1</span> <span class="keyword">row</span>)</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># insert into list values (1, 'beijing');</span></span><br><span class="line"><span class="keyword">INSERT</span> <span class="number">0</span> <span class="number">1</span></span><br><span class="line">young=<span class="comment"># insert into list values (2, 'hangzhou');</span></span><br><span class="line"><span class="keyword">ERROR</span>:  cannot run <span class="keyword">INSERT</span> command which targets <span class="keyword">no</span> shards</span><br><span class="line">HINT:  Make sure you have created a shard which can receive this <span class="keyword">partition</span> <span class="keyword">column</span> value.</span><br><span class="line">young=<span class="comment"># table list ;</span></span><br><span class="line"> <span class="keyword">id</span> |   <span class="keyword">col</span>   </span><br><span class="line"><span class="comment">----+---------</span></span><br><span class="line">  <span class="number">1</span> | beijing</span><br><span class="line">(<span class="number">1</span> <span class="keyword">row</span>)</span><br></pre></td></tr></table></figure>
+
+<h3 id="bulk-load-using-copy"><a href="#bulk-load-using-copy" class="headerlink" title="bulk load using copy"></a>bulk load using copy</h3><p>大小达到shard_max_size，将创建另一个新分片</p>
+<p>此示例中一个copy创建多个分片</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br></pre></td><td class="code"><pre><span class="line">young=<span class="comment"># show citus.shard_max_size ;</span></span><br><span class="line"> citus.shard_max_size </span><br><span class="line"><span class="comment">----------------------</span></span><br><span class="line"> 1GB</span><br><span class="line">(1 row)</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># table pg_dist_shard;</span></span><br><span class="line"> logicalrelid | shardid | shardstorage | shardminvalue | shardmaxvalue </span><br><span class="line"><span class="comment">--------------+---------+--------------+---------------+---------------</span></span><br><span class="line">(0 rows)</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># \copy github_events from '/data/citus/github_events-2015-01-01-0.csv' WITH (format CSV);</span></span><br><span class="line">COPY 7702</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># SELECT                                                                                  </span></span><br><span class="line">    n.nodename,</span><br><span class="line">    n.nodeport,</span><br><span class="line">    sum(foo.result::int4)</span><br><span class="line">FROM (</span><br><span class="line">    <span class="keyword">SELECT</span> *</span><br><span class="line">    <span class="keyword">FROM</span></span><br><span class="line">        run_command_on_shards (<span class="string">'github_events'</span>,</span><br><span class="line">            <span class="string">'select count(*) from %s'</span>)) <span class="keyword">AS</span> foo,</span><br><span class="line">    pg_dist_placement p,</span><br><span class="line">    pg_dist_node n</span><br><span class="line"><span class="keyword">WHERE</span></span><br><span class="line">    foo.shardid = p.shardid</span><br><span class="line">    <span class="keyword">AND</span> p.groupid = n.groupid</span><br><span class="line"><span class="keyword">GROUP</span> <span class="keyword">BY</span></span><br><span class="line">    n.nodename,</span><br><span class="line">    n.nodeport;</span><br><span class="line"> nodename  | nodeport | sum  </span><br><span class="line"><span class="comment">-----------+----------+------</span></span><br><span class="line"> 10.0.0.20 |     9432 | 7702</span><br><span class="line">(1 row)</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># table pg_dist_shard;</span></span><br><span class="line"> logicalrelid  | shardid | shardstorage |    shardminvalue    |    shardmaxvalue    </span><br><span class="line"><span class="comment">---------------+---------+--------------+---------------------+---------------------</span></span><br><span class="line"> github_events |  102053 | t            | 2015-01-01 00:00:00 | 2015-01-01 00:59:58</span><br><span class="line">(1 row)</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># SET citus.shard_max_size TO '4MB';</span></span><br><span class="line"><span class="keyword">SET</span></span><br><span class="line">young=<span class="comment"># show citus.shard_max_size ;</span></span><br><span class="line"> citus.shard_max_size </span><br><span class="line"><span class="comment">----------------------</span></span><br><span class="line"> <span class="number">4</span>MB</span><br><span class="line">(<span class="number">1</span> <span class="keyword">row</span>)</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># \copy github_events from '/data/citus/github_events-2015-01-01-1.csv' WITH (format CSV);</span></span><br><span class="line">COPY <span class="number">7427</span></span><br><span class="line">young=<span class="comment"># table pg_dist_shard;</span></span><br><span class="line"> logicalrelid  | shardid | shardstorage |    shardminvalue    |    shardmaxvalue    </span><br><span class="line"><span class="comment">---------------+---------+--------------+---------------------+---------------------</span></span><br><span class="line"> github_events |  <span class="number">102053</span> | t            | <span class="number">2015</span><span class="number">-01</span><span class="number">-01</span> <span class="number">00</span>:<span class="number">00</span>:<span class="number">00</span> | <span class="number">2015</span><span class="number">-01</span><span class="number">-01</span> <span class="number">00</span>:<span class="number">59</span>:<span class="number">58</span></span><br><span class="line"> github_events |  <span class="number">102054</span> | t            | <span class="number">2015</span><span class="number">-01</span><span class="number">-01</span> <span class="number">01</span>:<span class="number">00</span>:<span class="number">00</span> | <span class="number">2015</span><span class="number">-01</span><span class="number">-01</span> <span class="number">01</span>:<span class="number">14</span>:<span class="number">55</span></span><br><span class="line"> github_events |  <span class="number">102055</span> | t            | <span class="number">2015</span><span class="number">-01</span><span class="number">-01</span> <span class="number">01</span>:<span class="number">14</span>:<span class="number">55</span> | <span class="number">2015</span><span class="number">-01</span><span class="number">-01</span> <span class="number">01</span>:<span class="number">27</span>:<span class="number">40</span></span><br><span class="line"> github_events |  <span class="number">102056</span> | t            | <span class="number">2015</span><span class="number">-01</span><span class="number">-01</span> <span class="number">01</span>:<span class="number">27</span>:<span class="number">40</span> | <span class="number">2015</span><span class="number">-01</span><span class="number">-01</span> <span class="number">01</span>:<span class="number">41</span>:<span class="number">02</span></span><br><span class="line"> github_events |  <span class="number">102057</span> | t            | <span class="number">2015</span><span class="number">-01</span><span class="number">-01</span> <span class="number">01</span>:<span class="number">41</span>:<span class="number">02</span> | <span class="number">2015</span><span class="number">-01</span><span class="number">-01</span> <span class="number">01</span>:<span class="number">56</span>:<span class="number">29</span></span><br><span class="line"> github_events |  <span class="number">102058</span> | t            | <span class="number">2015</span><span class="number">-01</span><span class="number">-01</span> <span class="number">01</span>:<span class="number">56</span>:<span class="number">29</span> | <span class="number">2015</span><span class="number">-01</span><span class="number">-01</span> <span class="number">01</span>:<span class="number">59</span>:<span class="number">59</span></span><br><span class="line">(<span class="number">6</span> <span class="keyword">rows</span>)</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># SELECT              </span></span><br><span class="line">    n.nodename,</span><br><span class="line">    n.nodeport,</span><br><span class="line">    <span class="keyword">sum</span>(foo.result::int4)</span><br><span class="line"><span class="keyword">FROM</span> (</span><br><span class="line">    <span class="keyword">SELECT</span> *</span><br><span class="line">    <span class="keyword">FROM</span></span><br><span class="line">        run_command_on_shards (<span class="string">'github_events'</span>,</span><br><span class="line">            <span class="string">'select count(*) from %s'</span>)) <span class="keyword">AS</span> foo,</span><br><span class="line">    pg_dist_placement p,</span><br><span class="line">    pg_dist_node n</span><br><span class="line"><span class="keyword">WHERE</span></span><br><span class="line">    foo.shardid = p.shardid</span><br><span class="line">    <span class="keyword">AND</span> p.groupid = n.groupid</span><br><span class="line"><span class="keyword">GROUP</span> <span class="keyword">BY</span></span><br><span class="line">    n.nodename,</span><br><span class="line">    n.nodeport;</span><br><span class="line"> nodename  | nodeport | sum  </span><br><span class="line"><span class="comment">-----------+----------+------</span></span><br><span class="line"> 10.0.0.20 |     9432 | 9506</span><br><span class="line"> 10.0.0.5  |     9432 | 2300</span><br><span class="line"> 10.0.0.10 |     9432 | 1662</span><br><span class="line"> 10.0.0.21 |     9432 | 1661</span><br><span class="line">(4 rows)</span><br></pre></td></tr></table></figure>
+
+<h3 id="appending-to-existing-shards"><a href="#appending-to-existing-shards" class="headerlink" title="appending to existing shards"></a>appending to existing shards</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br></pre></td><td class="code"><pre><span class="line">young=<span class="comment"># create table test(id int , col int);</span></span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span></span><br><span class="line">young=<span class="comment"># SELECT create_distributed_table('test', 'col', 'append');</span></span><br><span class="line"><span class="keyword">NOTICE</span>:  <span class="keyword">using</span> <span class="keyword">statement</span>-based <span class="keyword">replication</span></span><br><span class="line">DETAIL:  Streaming <span class="keyword">replication</span> <span class="keyword">is</span> supported <span class="keyword">only</span> <span class="keyword">for</span> <span class="keyword">hash</span>-<span class="keyword">distributed</span> tables.</span><br><span class="line"> create_distributed_table </span><br><span class="line"><span class="comment">--------------------------</span></span><br><span class="line"> </span><br><span class="line">(<span class="number">1</span> <span class="keyword">row</span>)</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># create table tmp (id int, col int);</span></span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span></span><br><span class="line">young=<span class="comment"># insert into tmp select id, id from generate_series(1,5) as id;</span></span><br><span class="line"><span class="keyword">INSERT</span> <span class="number">0</span> <span class="number">5</span></span><br><span class="line">young=<span class="comment"># table tmp ;</span></span><br><span class="line"> <span class="keyword">id</span> | <span class="keyword">col</span> </span><br><span class="line"><span class="comment">----+-----</span></span><br><span class="line">  <span class="number">1</span> |   <span class="number">1</span></span><br><span class="line">  <span class="number">2</span> |   <span class="number">2</span></span><br><span class="line">  <span class="number">3</span> |   <span class="number">3</span></span><br><span class="line">  <span class="number">4</span> |   <span class="number">4</span></span><br><span class="line">  <span class="number">5</span> |   <span class="number">5</span></span><br><span class="line">(<span class="number">5</span> <span class="keyword">rows</span>)</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># select master_create_empty_shard('test');</span></span><br><span class="line"> master_create_empty_shard </span><br><span class="line"><span class="comment">---------------------------</span></span><br><span class="line">                    <span class="number">102059</span></span><br><span class="line">(<span class="number">1</span> <span class="keyword">row</span>)</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># SELECT master_append_table_to_shard(102059, 'tmp', '10.0.0.4', 9432);</span></span><br><span class="line"> master_append_table_to_shard </span><br><span class="line"><span class="comment">------------------------------</span></span><br><span class="line">                   <span class="number">0.00195312</span></span><br><span class="line">(<span class="number">1</span> <span class="keyword">row</span>)</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># table pg_dist_shard;</span></span><br><span class="line"> logicalrelid  | shardid | shardstorage |    shardminvalue    |    shardmaxvalue    </span><br><span class="line"><span class="comment">---------------+---------+--------------+---------------------+---------------------</span></span><br><span class="line"> <span class="keyword">test</span>          |  <span class="number">102059</span> | t            | <span class="number">1</span>                   | <span class="number">5</span></span><br><span class="line">(<span class="number">1</span> <span class="keyword">rows</span>)</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># table test ;</span></span><br><span class="line"> <span class="keyword">id</span> | <span class="keyword">col</span> </span><br><span class="line"><span class="comment">----+-----</span></span><br><span class="line">  <span class="number">1</span> |   <span class="number">1</span></span><br><span class="line">  <span class="number">2</span> |   <span class="number">2</span></span><br><span class="line">  <span class="number">3</span> |   <span class="number">3</span></span><br><span class="line">  <span class="number">4</span> |   <span class="number">4</span></span><br><span class="line">  <span class="number">5</span> |   <span class="number">5</span></span><br><span class="line">(<span class="number">5</span> <span class="keyword">rows</span>)</span><br></pre></td></tr></table></figure>
+
+<h3 id="other"><a href="#other" class="headerlink" title="other"></a>other</h3><p>ERROR:  cannot run INSERT command which targets multiple shards</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line">cat test.csv </span><br><span class="line">1,1</span><br><span class="line">2,2</span><br><span class="line">3,3</span><br><span class="line">4,4</span><br><span class="line">5,5</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># copy test from '/data/citus/test.csv' with csv;</span></span><br><span class="line">COPY 5</span><br><span class="line">young=<span class="comment"># table pg_dist_shard;</span></span><br><span class="line"> logicalrelid  | shardid | shardstorage |    shardminvalue    |    shardmaxvalue    </span><br><span class="line"><span class="comment">---------------+---------+--------------+---------------------+---------------------</span></span><br><span class="line"> test          |  102096 | t            | 1                   | 5</span><br><span class="line">(1 rows)</span><br><span class="line"></span><br><span class="line">cat test.csv </span><br><span class="line">7,7</span><br><span class="line">8,8</span><br><span class="line">young=<span class="comment"># copy test from '/data/citus/test.csv' with csv;</span></span><br><span class="line">COPY 2</span><br><span class="line">young=<span class="comment"># table pg_dist_shard;</span></span><br><span class="line"> logicalrelid  | shardid | shardstorage |    shardminvalue    |    shardmaxvalue    </span><br><span class="line"><span class="comment">---------------+---------+--------------+---------------------+---------------------</span></span><br><span class="line"> test          |  102096 | t            | 1                   | 5</span><br><span class="line"> test          |  102097 | t            | 7                   | 8</span><br><span class="line">(2 rows)</span><br><span class="line"></span><br><span class="line">cat test.csv </span><br><span class="line">8,8</span><br><span class="line">9,9</span><br><span class="line">young=<span class="comment"># copy test from '/data/citus/test.csv' with csv;</span></span><br><span class="line">COPY 2</span><br><span class="line">young=<span class="comment"># table pg_dist_shard;</span></span><br><span class="line"> logicalrelid  | shardid | shardstorage |    shardminvalue    |    shardmaxvalue    </span><br><span class="line"><span class="comment">---------------+---------+--------------+---------------------+---------------------</span></span><br><span class="line"> test          |  102096 | t            | 1                   | 5</span><br><span class="line"> test          |  102097 | t            | 7                   | 8</span><br><span class="line"> test          |  102098 | t            | 8                   | 9</span><br><span class="line">(3 rows)</span><br></pre></td></tr></table></figure>
+
+<p>shard_102097和shard_102098分区边界重合</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line">young=<span class="comment"># SELECT</span></span><br><span class="line">    n.nodename,</span><br><span class="line">    n.nodeport,</span><br><span class="line">    sum(foo.result::int4)</span><br><span class="line">FROM (</span><br><span class="line">    <span class="keyword">SELECT</span> *</span><br><span class="line">    <span class="keyword">FROM</span></span><br><span class="line">        run_command_on_shards (<span class="string">'test'</span>,</span><br><span class="line">            <span class="string">'select count(*) from %s'</span>)) <span class="keyword">AS</span> foo,</span><br><span class="line">    pg_dist_placement p,</span><br><span class="line">    pg_dist_node n</span><br><span class="line"><span class="keyword">WHERE</span></span><br><span class="line">    foo.shardid = p.shardid</span><br><span class="line">    <span class="keyword">AND</span> p.groupid = n.groupid</span><br><span class="line"><span class="keyword">GROUP</span> <span class="keyword">BY</span></span><br><span class="line">    n.nodename,</span><br><span class="line">    n.nodeport;</span><br><span class="line"> nodename  | nodeport | sum </span><br><span class="line"><span class="comment">-----------+----------+-----</span></span><br><span class="line"> 10.0.0.20 |     9432 |   2</span><br><span class="line"> 10.0.0.5  |     9432 |   2</span><br><span class="line"> 10.0.0.21 |     9432 |   5</span><br><span class="line">(3 rows)</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># insert into test values (8,8);</span></span><br><span class="line">ERROR:  cannot run <span class="keyword">INSERT</span> command which targets multiple shards</span><br><span class="line">HINT:  Make sure the <span class="keyword">value</span> <span class="keyword">for</span> <span class="keyword">partition</span> <span class="keyword">column</span> <span class="string">"col"</span> falls <span class="keyword">into</span> a single shard.</span><br></pre></td></tr></table></figure>
+
+
+
+<p>ERROR:  INSERT … SELECT into an append-distributed table is not supported</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">young=<span class="comment"># table pg_dist_shard;</span></span><br><span class="line"> logicalrelid | shardid | shardstorage |    shardminvalue    |    shardmaxvalue    </span><br><span class="line"><span class="comment">--------------+---------+--------------+---------------------+---------------------</span></span><br><span class="line"> range        |  102050 | t            | 11                  | 15</span><br><span class="line"> range        |  102049 | t            | 6                   | 10</span><br><span class="line"> range        |  102048 | t            | 0                   | 5</span><br><span class="line">(3 rows)</span><br><span class="line"></span><br><span class="line">young=<span class="comment"># insert into range select id, id from generate_series(1,15) as id;</span></span><br><span class="line">ERROR:  <span class="keyword">INSERT</span> ... <span class="keyword">SELECT</span> <span class="keyword">into</span> an append-<span class="keyword">distributed</span> <span class="keyword">table</span> <span class="keyword">is</span> <span class="keyword">not</span> supported</span><br></pre></td></tr></table></figure>
+
+<h2 id="replication-model"><a href="#replication-model" class="headerlink" title="replication model"></a>replication model</h2><p>以append方式建表时可以注意到</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">NOTICE:  using statement-based replication</span><br><span class="line">DETAIL:  Streaming replication is supported only for hash-distributed tables.</span><br></pre></td></tr></table></figure>
+
+<p>citus 有两种复制模式：基于语句复制、流复制</p>
+<p>最初版本的citus主要用来做实时分析，数据也是通过追加方式存储在分布式集群中。</p>
+<p>事件数据的这些属性使事件数据的并行加载变得相对容易，而不需要牺牲一致性语义。协调节点将保存与集群中的分片和分片放置(副本)相关的元数据。然后，客户机将与协调节点节点通信，并交换元数据，以便在这些元数据上附加事件数据分片。一旦客户端将相关事件数据附加到相关分片中，客户端将通过更新协调节点上的分片元数据来结束操作。</p>
+<p> <img src="/2019/11/07/citus-append-distribution/citus-batch-append-event-527c025d.jpg" alt="Citus cluster ingesting append-only events data from files"> </p>
+<p>上面的简化图显示了一个数据加载示例。客户端告诉协调节点节点，它希望将事件数据追加到追加分布式表中。协调节点向客户提供有关shard 6的位置信息。然后客户端将这些事件复制到分片的位置，并使用相关元数据更新协调节点。如果客户机无法将事件复制到其中一个节点，它可以将相关分片的位置标记为无效，也可以中止复制操作。</p>
+<p>追加分配还存在一个问题是不能更新数据，上面已经做过测试。</p>
+<p>因此，我们将Citus的基于语句的复制模型进行了扩展。 在该模型中，我们还提供了哈希分布作为一种数据分布方法。通过这种方式，用户可以轻松地更新和删除单独的行。启用更新和删除还需要解决两个问题:更新同一行的并发客户机，以及在更新期间一个shard副本不可用。 </p>
+<p>因此，我们以两种方式扩展了协调节点。首先，协调节点处理涉及相同分片的update和delete语句的锁定。其次，如果协调节点在写操作期间无法到达分片副本，则会将该副本标记为不健康。然后，用户将运行一个命令来修复不健康的副本。</p>
+<p>从一致性语义的角度来看，这种方法通常称为读写一致性（写后读一致性）。</p>
+<p> <img src="/2019/11/07/citus-append-distribution/citus-insert-update-user-66fbd116.jpg" alt="Citus cluster receiving inserts and updates for user data and one shard placement becomes unavailable"> </p>
+<p>假设您有200个表，如果并发更新了10个表的分片，但是无法到达保存分片副本的机器您需要将该机器上的所有200个分片副本标记为非活动的。</p>
+<p>如果高可用性特性，那么基于语句的复制通常是不够好的。</p>
+<p>解决方法之一是将 replication factor 设置为1，不使用副本。</p>
+<p>另一种方案是从基于语句复制切换到流复制。</p>
+<p>这种方法的架构如下：</p>
+<p> <img src="/2019/11/07/citus-append-distribution/citus-streaming-replica-setup-04917fc2.jpg" alt="Citus serving multi-tenant applications using streaming replication"> </p>
+
+    </div>
+
+    
+    
+    
+      
+        <div class="reward-container">
+  <div></div>
+  <button disable="enable" onclick="var qr = document.getElementById(&quot;qr&quot;); qr.style.display = (qr.style.display === 'none') ? 'block' : 'none';">
+    打赏
+  </button>
+  <div id="qr" style="display: none;">
+      
+      <div style="display: inline-block;">
+        <img src="/images/wechatpay.jpg" alt="Yang Jie 微信支付">
+        <p>微信支付</p>
+      </div>
+
+  </div>
+</div>
+
+        
+
+<div>
+<ul class="post-copyright">
+  <li class="post-copyright-author">
+    <strong>本文作者： </strong>Yang Jie
+  </li>
+  <li class="post-copyright-link">
+    <strong>本文链接：</strong>
+    <a href="http://blog.yonj1e.top/2019/11/07/citus-append-distribution/" title="Citus中的分片策略：Append Distribution追加分配">http://blog.yonj1e.top/2019/11/07/citus-append-distribution/</a>
+  </li>
+  <li class="post-copyright-license">
+    <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/zh-CN" rel="noopener" target="_blank"><i class="fa fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Sharding/" rel="tag"># Sharding</a>
+              <a href="/tags/Append-Distribution/" rel="tag"># Append Distribution</a>
+              <a href="/tags/statement-based-replication/" rel="tag"># statement-based replication</a>
+              <a href="/tags/streaming-replication/" rel="tag"># streaming replication</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-next post-nav-item">
+                <a href="/2019/06/27/orderby-limit-index/" rel="next" title="PostgreSQL中order by limit索引选择问题">
+                  <i class="fa fa-chevron-left"></i> PostgreSQL中order by limit索引选择问题
+                </a>
+            </div>
+
+            <span class="post-nav-divider"></span>
+
+            <div class="post-nav-prev post-nav-item">
+            </div>
+          </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Abstract"><span class="nav-number">1.</span> <span class="nav-text">Abstract</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Creating-and-Distributing-Tables"><span class="nav-number">2.</span> <span class="nav-text">Creating and Distributing Tables</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Expiring-Data"><span class="nav-number">3.</span> <span class="nav-text">Expiring Data</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Deleting-Data"><span class="nav-number">4.</span> <span class="nav-text">Deleting Data</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Dropping-Tables"><span class="nav-number">5.</span> <span class="nav-text">Dropping Tables</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Data-Loading"><span class="nav-number">6.</span> <span class="nav-text">Data Loading</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Bulk-load-using-copy"><span class="nav-number">6.1.</span> <span class="nav-text">Bulk load using \copy</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Incremental-loads-by-appending-to-existing-shards"><span class="nav-number">6.2.</span> <span class="nav-text">Incremental loads by appending to existing shards</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Example"><span class="nav-number">7.</span> <span class="nav-text">Example</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Range-Based-Sharding"><span class="nav-number">7.1.</span> <span class="nav-text">Range Based Sharding</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Directory-Based-Sharding"><span class="nav-number">7.2.</span> <span class="nav-text">Directory Based Sharding</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#bulk-load-using-copy"><span class="nav-number">7.3.</span> <span class="nav-text">bulk load using copy</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#appending-to-existing-shards"><span class="nav-number">7.4.</span> <span class="nav-text">appending to existing shards</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#other"><span class="nav-number">7.5.</span> <span class="nav-text">other</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#replication-model"><span class="nav-number">8.</span> <span class="nav-text">replication model</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <img class="site-author-image" itemprop="image" alt="Yang Jie"
+    src="/images/head.jpg">
+  <p class="site-author-name" itemprop="name">Yang Jie</p>
+  <div class="site-description" itemprop="description">Stay hungry, Stay young</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">7</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">4</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">13</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yonj1e" title="GitHub &amp;rarr; https:&#x2F;&#x2F;github.com&#x2F;yonj1e" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:yonj1e@163.com" title="E-Mail &amp;rarr; mailto:yonj1e@163.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 2016 – 
+  <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Yang Jie</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v4.0.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> v7.4.2
+  </div>
+
+        
+
+
+
+
+
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js?v=3.1.0"></script>
+  <script src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  <script src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+<script src="/js/utils.js?v=7.4.2"></script><script src="/js/motion.js?v=7.4.2"></script>
+<script src="/js/schemes/pisces.js?v=7.4.2"></script>
+<script src="/js/next-boot.js?v=7.4.2"></script><script src="/js/bookmark.js?v=7.4.2"></script>
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

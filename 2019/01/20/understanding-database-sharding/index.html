@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.0.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=7.4.2">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=7.4.2">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=7.4.2">
+  <link rel="mask-icon" href="/images/logo.svg?v=7.4.2" color="#222">
+
+<link rel="stylesheet" href="/css/main.css?v=7.4.2">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css?v=4.7.0">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Pisces',
+    version: '7.4.2',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":true,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    translation: {
+      copy_button: '复制',
+      copy_success: '复制成功',
+      copy_failure: '复制失败'
+    },
+    sidebarPadding: 40
+  };
+</script>
+
+  <meta name="description" content="https:&#x2F;&#x2F;www.digitalocean.com&#x2F;community&#x2F;tutorials&#x2F;understanding-database-sharding IntroductionAny application or website that sees significant growth will eventually need to scale in order to accommoda">
+<meta name="keywords" content="Sharding">
+<meta property="og:type" content="article">
+<meta property="og:title" content="了解数据库分片">
+<meta property="og:url" content="http:&#x2F;&#x2F;blog.yonj1e.top&#x2F;2019&#x2F;01&#x2F;20&#x2F;understanding-database-sharding&#x2F;index.html">
+<meta property="og:site_name" content="Yonj1e&#39;s Blog">
+<meta property="og:description" content="https:&#x2F;&#x2F;www.digitalocean.com&#x2F;community&#x2F;tutorials&#x2F;understanding-database-sharding IntroductionAny application or website that sees significant growth will eventually need to scale in order to accommoda">
+<meta property="og:locale" content="zh-CN">
+<meta property="og:image" content="http:&#x2F;&#x2F;blog.yonj1e.top&#x2F;2019&#x2F;01&#x2F;20&#x2F;understanding-database-sharding&#x2F;DB_image_1_cropped.png">
+<meta property="og:image" content="http:&#x2F;&#x2F;blog.yonj1e.top&#x2F;2019&#x2F;01&#x2F;20&#x2F;understanding-database-sharding&#x2F;DB_image_2_cropped.png">
+<meta property="og:image" content="http:&#x2F;&#x2F;blog.yonj1e.top&#x2F;2019&#x2F;01&#x2F;20&#x2F;understanding-database-sharding&#x2F;DB_image_3_cropped.png">
+<meta property="og:image" content="http:&#x2F;&#x2F;blog.yonj1e.top&#x2F;2019&#x2F;01&#x2F;20&#x2F;understanding-database-sharding&#x2F;DB_image_4_cropped.png">
+<meta property="og:updated_time" content="2020-07-18T14:11:26.132Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http:&#x2F;&#x2F;blog.yonj1e.top&#x2F;2019&#x2F;01&#x2F;20&#x2F;understanding-database-sharding&#x2F;DB_image_1_cropped.png">
+
+<link rel="canonical" href="http://blog.yonj1e.top/2019/01/20/understanding-database-sharding/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true,
+    isPage: false,
+    isArchive: false
+  };
+</script>
+
+  <title>了解数据库分片 | Yonj1e's Blog</title>
+  
+
+
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Yonj1e's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+        <p class="site-subtitle">PostgreSQL Developer & DBA, @ksyun.com</p>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <a role="button" class="book-mark-link book-mark-link-fixed"></a>
+
+  <a href="https://github.com/yonj1e" class="github-corner" title="Follow me on GitHub" aria-label="Follow me on GitHub" rel="noopener" target="_blank"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://blog.yonj1e.top/2019/01/20/understanding-database-sharding/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/head.jpg">
+      <meta itemprop="name" content="Yang Jie">
+      <meta itemprop="description" content="Stay hungry, Stay young">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Yonj1e's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          了解数据库分片
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2019-01-20 00:00:00" itemprop="dateCreated datePublished" datetime="2019-01-20T00:00:00+00:00">2019-01-20</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-07-18 14:11:26" itemprop="dateModified" datetime="2020-07-18T14:11:26+00:00">2020-07-18</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Database/" itemprop="url" rel="index">
+                    <span itemprop="name">Database</span>
+                  </a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p><a href="https://www.digitalocean.com/community/tutorials/understanding-database-sharding" target="_blank" rel="noopener">https://www.digitalocean.com/community/tutorials/understanding-database-sharding</a></p>
+<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>Any application or website that sees significant growth will eventually need to scale in order to accommodate increases in traffic. For data-driven applications and websites, it’s critical that scaling is done in a way that ensures the security and integrity of their data. It can be difficult to predict how popular a website or application will become or how long it will maintain that popularity, which is why some organizations choose a database architecture that allows them to scale their databases dynamically.</p>
+<p>任何看到显着增长的应用程序或网站最终都需要扩展以适应流量的增加。对于数据驱动的应用程序和网站，以确保其数据安全性和完整性的方式进行扩展至关重要。可能很难预测网站或应用程序的流行程度或维持流行程度的时间长短，这就是为什么有些组织选择允许它们动态扩展数据库的数据库体系结构的原因。</p>
+<p>In this conceptual article, we will discuss one such database architecture: <em>sharded databases</em>. Sharding has been receiving lots of attention in recent years, but many don’t have a clear understanding of what it is or the scenarios in which it might make sense to shard a database. We will go over what sharding is, some of its main benefits and drawbacks, and also a few common sharding methods.</p>
+<p>在这篇概念性文章中，我们将讨论一种这样的数据库架构：分片数据库。近年来，Sharding一直受到很多关注，但许多人并没有清楚地了解它是什么，也不清楚在哪些场景下对数据库进行分片是有意义。我们将讨论分片是什么，它的一些主要优点和缺点，以及一些常见的分片方法。</p>
+<h2 id="What-is-Sharding"><a href="#What-is-Sharding" class="headerlink" title="What is Sharding?"></a>What is Sharding?</h2><p>Sharding is a database architecture pattern related to <em>horizontal partitioning</em> — the practice of separating one table’s rows into multiple different tables, known as partitions. Each partition has the same schema and columns, but also entirely different rows. Likewise, the data held in each is unique and independent of the data held in other partitions.</p>
+<p>Sharding是一种与水平分区相关的数据库体系结构模式 - 将一个表的行分成多个不同的表（称为分区）的做法。每个分区都具有相同的模式和列，但也有完全不同的行。同样，每个数据中保存的数据都是唯一的，并且与其他分区中保存的数据无关。</p>
+<p>It can be helpful to think of horizontal partitioning in terms of how it relates to <em>vertical partitioning</em>. In a vertically-partitioned table, entire columns are separated out and put into new, distinct tables. The data held within one vertical partition is independent from the data in all the others, and each holds both distinct rows and columns. The following diagram illustrates how a table could be partitioned both horizontally and vertically:</p>
+<p>考虑水平分区与垂直分区的关系，可能会有所帮助。在垂直分区表中，整个列被分离出来并放入新的不同表中。保持在一个垂直分区内的数据独立于所有其他分区中的数据，并且每个数据都包含不同的行和列。下图说明了如何在水平和垂直方向上对表进行分区：</p>
+<p><img src="/2019/01/20/understanding-database-sharding/DB_image_1_cropped.png" alt="Example tables showing horizontal and vertical partitioning"></p>
+<p>Sharding involves breaking up one’s data into two or more smaller chunks, called <em>logical shards</em>. The logical shards are then distributed across separate database nodes, referred to as <em>physical shards</em>, which can hold multiple logical shards. Despite this, the data held within all the shards collectively represent an entire logical dataset.</p>
+<p>分片涉及将一个数据分成两个或多个较小的块，称为逻辑分片。然后，逻辑分片分布在单独的数据库节点上，称为物理分片，它可以容纳多个逻辑分片。尽管如此，所有分片中保存的数据共同代表整个逻辑数据集。</p>
+<p>Database shards exemplify a <a href="https://en.wikipedia.org/wiki/Shared-nothing_architecture" target="_blank" rel="noopener"><em>shared-nothing architecture</em></a>. This means that the shards are autonomous; they don’t share any of the same data or computing resources. In some cases, though, it may make sense to replicate certain tables into each shard to serve as reference tables. For example, let’s say there’s a database for an application that depends on fixed conversion rates for weight measurements. By replicating a table containing the necessary conversion rate data into each shard, it would help to ensure that all of the data required for queries is held in every shard.</p>
+<p>数据库分片举例说明了<a href="https://en.wikipedia.org/wiki/Shared-nothing_architecture" target="_blank" rel="noopener">shared-nothing架构</a>。这意味着分片是自治的; 它们不共享任何相同的数据或计算资源。但是，在某些情况下，将某些表复制到每个分片中作为参考表可能是有意义的。例如，假设某个应用程序的数据库依赖于用于重量测量的固定转换率。通过将包含必要转换率数据的表复制到每个分片中，有助于确保查询所需的所有数据都保存在每个分片中。</p>
+<p>Oftentimes, sharding is implemented at the application level, meaning that the application includes code that defines which shard to transmit reads and writes to. However, some database management systems have sharding capabilities built in, allowing you to implement sharding directly at the database level.</p>
+<p>通常，在应用程序级别实现分片，这意味着应用程序包含定义传输读取和写入的分片的代码。但是，某些数据库管理系统内置了分片功能，允许您直接在数据库级别实现分片。</p>
+<p>Given this general overview of sharding, let’s go over some of the positives and negatives associated with this database architecture.</p>
+<p>给出了分片的一般概述，让我们来看看与此数据库体系结构相关的一些优点和缺点。</p>
+<h2 id="Benefits-of-Sharding"><a href="#Benefits-of-Sharding" class="headerlink" title="Benefits of Sharding"></a>Benefits of Sharding</h2><p>The main appeal of sharding a database is that it can help to facilitate <em>horizontal scaling</em>, also known as <em>scaling out</em>. Horizontal scaling is the practice of adding more machines to an existing stack in order to spread out the load and allow for more traffic and faster processing. This is often contrasted with <em>vertical scaling</em>, otherwise known as <em>scaling up</em>, which involves upgrading the hardware of an existing server, usually by adding more RAM or CPU.</p>
+<p>分片数据库的主要吸引力在于它可以帮助促进水平扩展，也称为横向扩展。水平扩展是向现有堆栈添加更多机器的做法，以便分散负载并允许更多流量和更快的处理。这通常与垂直扩展形成对比，也称为纵向扩展，这涉及升级现有服务器的硬件，通常是添加更多RAM或CPU。</p>
+<p>It’s relatively simple to have a relational database running on a single machine and scale it up as necessary by upgrading its computing resources. Ultimately, though, any non-distributed database will be limited in terms of storage and compute power, so having the freedom to scale horizontally makes your setup far more flexible.</p>
+<p>让关系数据库在单个机器上运行并通过升级其计算资源根据需要进行扩展是相对简单的。但最终，任何非分布式数据库在存储和计算能力方面都会受到限制，因此可以自由地水平扩展，使您的设置更加灵活。</p>
+<p>Another reason why some might choose a sharded database architecture is to speed up query response times. When you submit a query on a database that hasn’t been sharded, it may have to search every row in the table you’re querying before it can find the result set you’re looking for. For an application with a large, monolithic database, queries can become prohibitively slow. By sharding one table into multiple, though, queries have to go over fewer rows and their result sets are returned much more quickly.</p>
+<p>某些人可能选择分片数据库体系结构的另一个原因是加快查询响应时间。当您对尚未分片的数据库提交查询时，可能必须先搜索您查询的表中的每一行，然后才能找到您要查找的结果集。对于具有大型单片数据库的应用程序，查询可能变得极其缓慢。但是，通过将一个表分成多个，查询只需遍历更少的行，并且返回结果集的速度要快得多。</p>
+<p>Sharding can also help to make an application more reliable by mitigating the impact of outages. If your application or website relies on an unsharded database, an outage has the potential to make the entire application unavailable. With a sharded database, though, an outage is likely to affect only a single shard. Even though this might make some parts of the application or website unavailable to some users, the overall impact would still be less than if the entire database crashed.</p>
+<p>分片还可以通过减少中断的影响来帮助提高应用程序的可靠性。如果您的应用程序或网站依赖于未加密的数据库，则中断可能会导致整个应用程序不可用。但是，对于分片数据库，中断可能只会影响单个分片。即使这可能使某些用户无法使用某些应用程序或网站部分，但整体影响仍会低于整个数据库崩溃的影响。</p>
+<h2 id="Drawbacks-of-Sharding"><a href="#Drawbacks-of-Sharding" class="headerlink" title="Drawbacks of Sharding"></a>Drawbacks of Sharding</h2><p>While sharding a database can make scaling easier and improve performance, it can also impose certain limitations. Here, we’ll discuss some of these and why they might be reasons to avoid sharding altogether.</p>
+<p>虽然对数据库进行分片可以使扩展更容易并提高性能，但它也可能会带来某些限制。在这里，我们将讨论其中的一些以及为什么它们可能是完全避免分片的原因。</p>
+<p>The first difficulty that people encounter with sharding is the sheer complexity of properly implementing a sharded database architecture. If done incorrectly, there’s a significant risk that the sharding process can lead to lost data or corrupted tables. Even when done correctly, though, sharding is likely to have a major impact on your team’s workflows. Rather than accessing and managing one’s data from a single entry point, users must manage data across multiple shard locations, which could potentially be disruptive to some teams.</p>
+<p>人们遇到分片的第一个困难是正确实现分片数据库体系结构的复杂性。如果操作不正确，则分片过程可能会导致数据丢失或表损坏。即使正确完成，分片也可能对您团队的工作流程产生重大影响。用户必须跨多个分片位置管理数据，而不是从单个入口点访问和管理一个数据，这可能会对某些团队造成干扰。</p>
+<p>One problem that users sometimes encounter after having sharded a database is that the shards eventually become unbalanced. By way of example, let’s say you have a database with two separate shards, one for customers whose last names begin with letters A through M and another for those whose names begin with the letters N through Z. However, your application serves an inordinate amount of people whose last names start with the letter G. Accordingly, the A-M shard gradually accrues more data than the N-Z one, causing the application to slow down and stall out for a significant portion of your users. The A-M shard has become what is known as a <em>database hotspot</em>. In this case, any benefits of sharding the database are canceled out by the slowdowns and crashes. The database would likely need to be repaired and resharded to allow for a more even data distribution.</p>
+<p>用户在对数据库进行分片后有时会遇到的一个问题是分片最终会变得不平衡。举例来说，假设您有一个带有两个单独分片的数据库，一个用于姓氏以字母A到M开头的客户，另一个用于名称以字母N到Z开头的客户。但是，您的应用程序为大量姓氏以字母G开头的人提供服务。因此，A-M分片逐渐累积的数据多于N-Z分片，导致应用程序为您的大部分用户放慢速度并使其处于停滞状态。A-M分片已成为所谓的数据库热点。在这种情况下，分片数据库的任何好处都会被减速和崩溃所抵消。数据库可能需要修复和重新分片才能实现更均匀的数据分发。</p>
+<p>Another major drawback is that once a database has been sharded, it can be very difficult to return it to its unsharded architecture. Any backups of the database made before it was sharded won’t include data written since the partitioning. Consequently, rebuilding the original unsharded architecture would require merging the new partitioned data with the old backups or, alternatively, transforming the partitioned DB back into a single DB, both of which would be costly and time consuming endeavors.</p>
+<p>另一个主要缺点是，一旦数据库被分片，就很难将其返回到未分片的体系结构中。在对数据库进行分片之前所做的任何备份都不会包括自分片后写入的数据。因此，重建原始的未分片体系结构将需要将新的分区数据与旧的备份合并，或者，将分片的DB转换回单个DB，这两个过程都将花费大量的时间和精力。</p>
+<p>A final disadvantage to consider is that sharding isn’t natively supported by every database engine. For instance, PostgreSQL does not include automatic sharding as a feature, although it is possible to manually shard a PostgreSQL database. There are a number of Postgres forks that do include automatic sharding, but these often trail behind the latest PostgreSQL release and lack certain other features. Some specialized database technologies — like MySQL Cluster or certain database-as-a-service products like MongoDB Atlas — do include auto-sharding as a feature, but vanilla versions of these database management systems do not. Because of this, sharding often requires a “roll your own” approach. This means that documentation for sharding or tips for troubleshooting problems are often difficult to find.</p>
+<p>要考虑的最后一个缺点是每个数据库引擎本身都不支持分片。例如，PostgreSQL不包括自动分片作为功能，尽管可以手动分片PostgreSQL数据库。有许多Postgres分支包括自动分片，但这些分支通常落后于最新的PostgreSQL版本，缺乏某些其他功能。一些专门的数据库技术 - 如MySQL Cluster或某些数据库即服务产品（如MongoDB Atlas）确实包含自动分片功能，但这些数据库管理系统的普通版本却没有。因此，分片通常需要自己动手的方法。这意味着通常很难找到用于分片的文档或用于解决问题的提示。</p>
+<p>These are, of course, only some general issues to consider before sharding. There may be many more potential drawbacks to sharding a database depending on its use case.</p>
+<p>当然，这些只是在分片之前要考虑的一些一般性问题。根据其用例，对数据库进行分片可能存在许多潜在的缺点。</p>
+<p>Now that we’ve covered a few of sharding’s drawbacks and benefits, we will go over a few different architectures for sharded databases.</p>
+<p>现在我们已经介绍了一些分片的缺点和好处，我们将讨论一些分片数据库的不同架构。</p>
+<h2 id="Sharding-Architectures"><a href="#Sharding-Architectures" class="headerlink" title="Sharding Architectures"></a>Sharding Architectures</h2><p>Once you’ve decided to shard your database, the next thing you need to figure out is how you’ll go about doing so. When running queries or distributing incoming data to sharded tables or databases, it’s crucial that it goes to the correct shard. Otherwise, it could result in lost data or painfully slow queries. In this section, we’ll go over a few common sharding architectures, each of which uses a slightly different process to distribute data across shards.</p>
+<p>一旦你决定对你的数据库进行分片，你需要弄清楚的是你将如何去做。在运行查询或将传入数据分发到分片表或数据库时，它必须转到正确的分片。否则，它可能导致数据丢失或查询速度缓慢。在本节中，我们将介绍一些常见的分片架构，每个架构使用稍微不同的过程来跨分片分发数据。</p>
+<h3 id="Key-Based-Sharding"><a href="#Key-Based-Sharding" class="headerlink" title="Key Based Sharding"></a>Key Based Sharding</h3><p><em>Key based sharding</em>, also known as <em>hash based sharding</em>, involves using a value taken from newly written data — such as a customer’s ID number, a client application’s IP address, a ZIP code, etc. — and plugging it into a <em>hash function</em> to determine which shard the data should go to. A hash function is a function that takes as input a piece of data (for example, a customer email) and outputs a discrete value, known as a <em>hash value</em>. In the case of sharding, the hash value is a shard ID used to determine which shard the incoming data will be stored on. Altogether, the process looks like this:</p>
+<p>基于键值的分片（也称为基于散列的分片）涉及使用从新写入的数据中获取的值 - 例如客户的ID号，客户端应用程序的IP地址，邮政编码等 - 并将其插入哈希函数以确定数据应该去哪个分片。哈希函数是将一段数据（例如，客户电子邮件）作为输入并输出离散值（称为哈希值）的函数。在分片的情况下，散列值是一个分片ID，用于确定传入数据将存储在哪个分片上。总而言之，这个过程看起来像这样：</p>
+<p><img src="/2019/01/20/understanding-database-sharding/DB_image_2_cropped.png" alt="Key based sharding example diagram"></p>
+<p>To ensure that entries are placed in the correct shards and in a consistent manner, the values entered into the hash function should all come from the same column. This column is known as a <em>shard key</em>. In simple terms, shard keys are similar to <a href="https://en.wikipedia.org/wiki/Primary_key" target="_blank" rel="noopener"><em>primary keys</em></a> in that both are columns which are used to establish a unique identifier for individual rows. Broadly speaking, a shard key should be static, meaning it shouldn’t contain values that might change over time. Otherwise, it would increase the amount of work that goes into update operations, and could slow down performance.</p>
+<p>为了确保条目以正确的方式放置在正确的分片中，输入散列函数的值应该都来自同一列。此列称为分片key。简单来说，分片键与<a href="https://en.wikipedia.org/wiki/Primary_key" target="_blank" rel="noopener">主键</a>类似，因为它们都是用于为各行建立唯一标识符的列。一般来说，分片键应该是静态的，这意味着它不应包含可能随时间变化的值。否则，它会增加更新操作的工作量，并可能降低性能。</p>
+<p>While key based sharding is a fairly common sharding architecture, it can make things tricky when trying to dynamically add or remove additional servers to a database. As you add servers, each one will need a corresponding hash value and many of your existing entries, if not all of them, will need to be remapped to their new, correct hash value and then migrated to the appropriate server. As you begin rebalancing the data, neither the new nor the old hashing functions will be valid. Consequently, your server won’t be able to write any new data during the migration and your application could be subject to downtime.</p>
+<p>虽然基于键值的分片是一种相当常见的分片架构，但在尝试动态添加或删除数据库中的其他服务器时，它会使事情变得棘手。在添加服务器时，每个服务器都需要一个相应的哈希值，并且许多现有条目（如果不是全部）都需要重新映射到新的正确哈希值，然后迁移到相应的服务器。当您开始重新平衡数据时，新旧散列函数都不会有效。因此，您的服务器将无法在迁移期间写入任何新数据，您的应用程序可能会停机。</p>
+<p>The main appeal of this strategy is that it can be used to evenly distribute data so as to prevent hotspots. Also, because it distributes data algorithmically, there’s no need to maintain a map of where all the data is located, as is necessary with other strategies like range or directory based sharding.</p>
+<p>该策略的主要吸引力在于它可以用于均匀分布数据以防止热点。此外，由于它以算法方式分配数据，因此无需维护所有数据所在位置的映射，这是其他策略（如范围或基于目录的分片）所必需的。</p>
+<h3 id="Range-Based-Sharding"><a href="#Range-Based-Sharding" class="headerlink" title="Range Based Sharding"></a>Range Based Sharding</h3><p><em>Range based sharding</em> involves sharding data based on ranges of a given value. To illustrate, let’s say you have a database that stores information about all the products within a retailer’s catalog. You could create a few different shards and divvy up each products’ information based on which price range they fall into, like this:</p>
+<p>基于范围的分片涉及基于给定值的范围分片数据。为了说明，假设您有一个数据库，用于存储零售商目录中所有产品的信息。您可以创建一些不同的分片，并根据每个产品的价格范围分配每个产品的信息，如下所示：</p>
+<p><img src="/2019/01/20/understanding-database-sharding/DB_image_3_cropped.png" alt="Range based sharding example diagram"></p>
+<p>The main benefit of range based sharding is that it’s relatively simple to implement. Every shard holds a different set of data but they all have an identical schema as one another, as well as the original database. The application code just reads which range the data falls into and writes it to the corresponding shard.</p>
+<p>基于范围的分片的主要好处是它实现起来相对简单。每个分片都包含一组不同的数据，但它们都具有相同的模式，以及原始数据库。应用程序代码只读取数据所属的范围并将其写入相应的分片。</p>
+<p>On the other hand, range based sharding doesn’t protect data from being unevenly distributed, leading to the aforementioned database hotspots. Looking at the example diagram, even if each shard holds an equal amount of data the odds are that specific products will receive more attention than others. Their respective shards will, in turn, receive a disproportionate number of reads.</p>
+<p>另一方面，基于范围的分片不能防止数据分布不均匀，导致上述数据库热点。查看示例图，即使每个分片拥有相同数量的数据，特定产品的可能性也会高于其他产品。反过来，它们各自的分片将接收不成比例的读取次数。</p>
+<h3 id="Directory-Based-Sharding"><a href="#Directory-Based-Sharding" class="headerlink" title="Directory Based Sharding"></a>Directory Based Sharding</h3><p>To implement <em>directory based sharding</em>, one must create and maintain a <em>lookup table</em> that uses a shard key to keep track of which shard holds which data. In a nutshell, a lookup table is a table that holds a static set of information about where specific data can be found. The following diagram shows a simplistic example of directory based sharding:</p>
+<p>要实现基于目录的分片，必须创建并维护一个查找表，该查找表使用分片键来跟踪哪个分片包含哪些数据。简而言之，查找表是一个表，其中包含有关可以找到特定数据的静态信息集。下图显示了基于目录的分片的简单示例：</p>
+<p><img src="/2019/01/20/understanding-database-sharding/DB_image_4_cropped.png" alt="Directory based sharding example diagram"></p>
+<p>Here, the <strong>Delivery Zone</strong> column is defined as a shard key. Data from the shard key is written to the lookup table along with whatever shard each respective row should be written to. This is similar to range based sharding, but instead of determining which range the shard key’s data falls into, each key is tied to its own specific shard. Directory based sharding is a good choice over range based sharding in cases where the shard key has a low cardinality and it doesn’t make sense for a shard to store a range of keys. Note that it’s also distinct from key based sharding in that it doesn’t process the shard key through a hash function; it just checks the key against a lookup table to see where the data needs to be written.</p>
+<p>此处，”Delivery Zone“列定义为分片键。来自分片键的数据被写入查找表以及应该写入每个相应行的任何分片。这与基于范围的分片类似，但不是确定分片键的数据属于哪个范围，而是将每个键绑定到其自己的特定分片。在分片键具有低基数并且分片存储一系列键没有意义的情况下，基于目录分片是比基于范围分片更理想的选择。请注意，它也不同于基于键值的分片，因为它不通过散列函数处理分片键; 它只是根据查找表检查key，以查看数据需要写入的位置。</p>
+<p>The main appeal of directory based sharding is its flexibility. Range based sharding architectures limit you to specifying ranges of values, while key based ones limit you to using a fixed hash function which, as mentioned previously, can be exceedingly difficult to change later on. Directory based sharding, on the other hand, allows you to use whatever system or algorithm you want to assign data entries to shards, and it’s relatively easy dynamically add shards using this approach.</p>
+<p>基于目录的分片的主要吸引力在于其灵活性。基于范围的分片架构限制您指定值的范围，而基于键值的分片限制您使用固定的散列函数，如前所述，稍后可能非常难以更改该函数。另一方面，基于目录的分片允许您使用任何你想要的系统或算法将数据条目分配给分片，并且使用此方法动态添加分片相对容易。</p>
+<p>While directory based sharding is the most flexible of the sharding methods discussed here, the need to connect to the lookup table before every query or write can have a detrimental impact on an application’s performance. Furthermore, the lookup table can become a single point of failure: if it becomes corrupted or otherwise fails, it can impact one’s ability to write new data or access their existing data.</p>
+<p>虽然基于目录的分片是这里讨论的最灵活的分片方法，但是在每次查询或写入之前连接到查找表，会对应用程序的性能产生不利影响。此外，查找表可能成为单点故障：如果它被损坏或以其他方式失败，它可能会影响一个人编写新数据或访问其现有数据的能力。</p>
+<h2 id="Should-I-Shard"><a href="#Should-I-Shard" class="headerlink" title="Should I Shard?"></a>Should I Shard?</h2><p>Whether or not one should implement a sharded database architecture is almost always a matter of debate. Some see sharding as an inevitable outcome for databases that reach a certain size, while others see it as a headache that should be avoided unless it’s absolutely necessary, due to the operational complexity that sharding adds.</p>
+<p>是否应该实现分片数据库架构几乎总是一个争论的问题。有些人认为分片是达到一定规模的数据库的必然结果，而其他人则认为这是一个令人头疼的问题，除非绝对必要，否则应该避免，因为分片增加了操作的复杂性。</p>
+<p>Because of this added complexity, sharding is usually only performed when dealing with very large amounts of data. Here are some common scenarios where it may be beneficial to shard a database:</p>
+<p>由于这种增加的复杂性，通常仅在处理非常大量的数据时才执行分片。以下是一些常见方案，其中对数据库进行分片可能是有益的：</p>
+<ul>
+<li>The amount of application data grows to exceed the storage capacity of a single database node.</li>
+<li>应用程序数据量增长到超过单个数据库节点的存储容量。</li>
+<li>The volume of writes or reads to the database surpasses what a single node or its read replicas can handle, resulting in slowed response times or timeouts.</li>
+<li>对数据库的写入或读取量超过单个节点或其读取副本可以处理的量，从而导致响应时间减慢或超时。</li>
+<li>The network bandwidth required by the application outpaces the bandwidth available to a single database node and any read replicas, resulting in slowed response times or timeouts.</li>
+<li>应用程序所需的网络带宽超过单个数据库节点和任何只读副本可用的带宽，从而导致响应时间减慢或超时。</li>
+</ul>
+<p>Before sharding, you should exhaust all other options for optimizing your database. Some optimizations you might want to consider include:</p>
+<p>在分片之前，您应该用尽所有其他选项来优化数据库。您可能需要考虑的一些优化包括：</p>
+<ul>
+<li><strong>Setting up a remote database</strong>. If you’re working with a monolithic application in which all of its components reside on the same server, you can improve your database’s performance by moving it over to its own machine. This doesn’t add as much complexity as sharding since the database’s tables remain intact. However, it still allows you to vertically scale your database apart from the rest of your infrastructure.</li>
+<li><strong>设置远程数据库</strong>。如果您正在使用其所有组件都驻留在同一服务器上的单一应用程序，则可以通过将其移动到自己的计算机来提高数据库的性能。由于数据库的表保持不变，因此这不会增加分片的复杂性。但是，它仍允许您将数据库与其他基础结构进行垂直扩展。</li>
+<li><strong>Implementing caching</strong>. If your application’s read performance is what’s causing you trouble, caching is one strategy that can help to improve it. Caching involves temporarily storing data that has already been requested in memory, allowing you to access it much more quickly later on.</li>
+<li><strong>实现缓存</strong>。如果您的应用程序的读取性能导致您遇到麻烦，那么缓存是一种可以帮助改进它的策略。缓存涉及临时存储已在内存中请求的数据，以便您以后更快地访问它。</li>
+<li><strong>Creating one or more read replicas</strong>. Another strategy that can help to improve read performance, this involves copying the data from one database server (the <em>primary server</em>) over to one or more <em>secondary servers</em>. Following this, every new write goes to the primary before being copied over to the secondaries, while reads are made exclusively to the secondary servers. Distributing reads and writes like this keeps any one machine from taking on too much of the load, helping to prevent slowdowns and crashes. Note that creating read replicas involves more computing resources and thus costs more money, which could be a significant constraint for some.</li>
+<li><strong>创建一个或多个只读副本</strong>。另一种有助于提高读取性能的策略，包括将数据从一个数据库服务器（主服务器）复制到一个或多个备用服务器。在此之后，每个新写入在复制到备节点之前都会转到主节点，而只能对备用服务器进行读取。像这样分发读写可以防止任何一台机器承担过多的负载，从而有助于防止速度下降和崩溃。请注意，创建只读副本涉及更多的计算资源，因此需要花费更多的钱，这可能是一些人的重要约束。</li>
+<li><strong>Upgrading to a larger server</strong>. In most cases, scaling up one’s database server to a machine with more resources requires less effort than sharding. As with creating read replicas, an upgraded server with more resources will likely cost more money. Accordingly, you should only go through with resizing if it truly ends up being your best option.</li>
+<li><strong>升级到更大的服务器</strong>。在大多数情况下，将一个人的数据库服务器扩展到具有更多资源的计算机比分片需要更少的工作量。与创建只读副本一样，具有更多资源的升级服务器可能会花费更多的钱。因此，如果它真的最终成为您的最佳选择，您应该只进行调整大小。</li>
+</ul>
+<p>Bear in mind that if your application or website grows past a certain point, none of these strategies will be enough to improve performance on their own. In such cases, sharding may indeed be the best option for you.</p>
+<p>请记住，如果您的应用程序或网站超过某一点，那么这些策略都不足以提高自己的性能。在这种情况下，分片可能确实是您的最佳选择。</p>
+<h2 id="Conclusion"><a href="#Conclusion" class="headerlink" title="Conclusion"></a>Conclusion</h2><p>Sharding can be a great solution for those looking to scale their database horizontally. However, it also adds a great deal of complexity and creates more potential failure points for your application. Sharding may be necessary for some, but the time and resources needed to create and maintain a sharded architecture could outweigh the benefits for others.</p>
+<p>对于那些希望横向扩展数据库的人来说，分片是一个很好的解决方案。但是，它还会增加很多复杂性，并为您的应用程序创建更多潜在的故障点。某些人可能需要进行分片，但创建和维护分片结构所需的时间和资源可能会超过其他人的好处。</p>
+<p>By reading this conceptual article, you should have a clearer understanding of the pros and cons of sharding. Moving forward, you can use this insight to make a more informed decision about whether or not a sharded database architecture is right for your application.</p>
+<p>通过阅读这篇概念性文章，您应该更清楚地了解分片的优缺点。展望未来，您可以使用此洞察力来更明智地决定分片数据库体系结构是否适合您的应用程序。</p>
+
+    </div>
+
+    
+    
+    
+      
+        <div class="reward-container">
+  <div></div>
+  <button disable="enable" onclick="var qr = document.getElementById(&quot;qr&quot;); qr.style.display = (qr.style.display === 'none') ? 'block' : 'none';">
+    打赏
+  </button>
+  <div id="qr" style="display: none;">
+      
+      <div style="display: inline-block;">
+        <img src="/images/wechatpay.jpg" alt="Yang Jie 微信支付">
+        <p>微信支付</p>
+      </div>
+
+  </div>
+</div>
+
+        
+
+<div>
+<ul class="post-copyright">
+  <li class="post-copyright-author">
+    <strong>本文作者： </strong>Yang Jie
+  </li>
+  <li class="post-copyright-link">
+    <strong>本文链接：</strong>
+    <a href="http://blog.yonj1e.top/2019/01/20/understanding-database-sharding/" title="了解数据库分片">http://blog.yonj1e.top/2019/01/20/understanding-database-sharding/</a>
+  </li>
+  <li class="post-copyright-license">
+    <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/zh-CN" rel="noopener" target="_blank"><i class="fa fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Sharding/" rel="tag"># Sharding</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-next post-nav-item">
+                <a href="/2018/12/29/misoperation-recovery/" rel="next" title="浅谈数据库误操作恢复">
+                  <i class="fa fa-chevron-left"></i> 浅谈数据库误操作恢复
+                </a>
+            </div>
+
+            <span class="post-nav-divider"></span>
+
+            <div class="post-nav-prev post-nav-item">
+                <a href="/2019/03/20/dockerfile-usage/" rel="prev" title="用Dockerfile打造自动化构建工具">
+                  用Dockerfile打造自动化构建工具 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Introduction"><span class="nav-number">1.</span> <span class="nav-text">Introduction</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#What-is-Sharding"><span class="nav-number">2.</span> <span class="nav-text">What is Sharding?</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Benefits-of-Sharding"><span class="nav-number">3.</span> <span class="nav-text">Benefits of Sharding</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Drawbacks-of-Sharding"><span class="nav-number">4.</span> <span class="nav-text">Drawbacks of Sharding</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Sharding-Architectures"><span class="nav-number">5.</span> <span class="nav-text">Sharding Architectures</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Key-Based-Sharding"><span class="nav-number">5.1.</span> <span class="nav-text">Key Based Sharding</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Range-Based-Sharding"><span class="nav-number">5.2.</span> <span class="nav-text">Range Based Sharding</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Directory-Based-Sharding"><span class="nav-number">5.3.</span> <span class="nav-text">Directory Based Sharding</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Should-I-Shard"><span class="nav-number">6.</span> <span class="nav-text">Should I Shard?</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Conclusion"><span class="nav-number">7.</span> <span class="nav-text">Conclusion</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <img class="site-author-image" itemprop="image" alt="Yang Jie"
+    src="/images/head.jpg">
+  <p class="site-author-name" itemprop="name">Yang Jie</p>
+  <div class="site-description" itemprop="description">Stay hungry, Stay young</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">7</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">4</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">13</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yonj1e" title="GitHub &amp;rarr; https:&#x2F;&#x2F;github.com&#x2F;yonj1e" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:yonj1e@163.com" title="E-Mail &amp;rarr; mailto:yonj1e@163.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 2016 – 
+  <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Yang Jie</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v4.0.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> v7.4.2
+  </div>
+
+        
+
+
+
+
+
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js?v=3.1.0"></script>
+  <script src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  <script src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+<script src="/js/utils.js?v=7.4.2"></script><script src="/js/motion.js?v=7.4.2"></script>
+<script src="/js/schemes/pisces.js?v=7.4.2"></script>
+<script src="/js/next-boot.js?v=7.4.2"></script><script src="/js/bookmark.js?v=7.4.2"></script>
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>
